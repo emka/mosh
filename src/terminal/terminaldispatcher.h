@@ -37,6 +37,8 @@
 #include <string>
 #include <map>
 
+#include "terminalgraphics.h"
+
 namespace Parser {
   class Action;
   class Param;
@@ -91,6 +93,7 @@ namespace Terminal {
     std::vector<wchar_t> OSC_string; /* only used to set the window title */
     std::string APC_string; /* the body of the application program command being received */
     bool APC_too_long; /* the body outgrew the longest command worth reading and is dropped */
+    GraphicsReceiver graphics;
 
     void parse_params( void );
 
@@ -120,7 +123,7 @@ namespace Terminal {
 
     void APC_start( const Parser::APC_Start *act );
     void APC_put( const Parser::APC_Put *act );
-    const std::string & get_APC_string( void ) const { return APC_string; }
+    void APC_dispatch( Framebuffer *fb );
 
     bool operator==( const Dispatcher &x ) const;
   };

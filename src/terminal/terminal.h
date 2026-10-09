@@ -66,7 +66,6 @@ namespace Terminal {
   private:
     Framebuffer fb;
     Dispatcher dispatch;
-    GraphicsReceiver graphics;
     UserInput user;
 
     /* action methods */

@@ -47,7 +47,7 @@ static const size_t MAXIMUM_CLIPBOARD_SIZE = 16*1024;
 
 Dispatcher::Dispatcher()
   : params(), parsed_params(), parsed( false ), dispatch_chars(),
-    OSC_string(), APC_string(), APC_too_long( false ), terminal_to_host()
+    OSC_string(), APC_string(), APC_too_long( false ), graphics(), terminal_to_host()
 {}
 
 void Dispatcher::newparamchar( const Parser::Param *act )
@@ -251,6 +251,11 @@ void Dispatcher::APC_start( const Parser::APC_Start *act __attribute((unused)) )
 {
   APC_string.clear();
   APC_too_long = false;
+}
+
+void Dispatcher::APC_dispatch( Framebuffer *fb )
+{
+  terminal_to_host.append( graphics.apply( APC_string, fb->get_mutable_images() ) );
 }
 
 void Dispatcher::APC_put( const Parser::APC_Put *act )
