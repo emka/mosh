@@ -33,6 +33,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <map>
 
 #include "terminalgraphics.h"
@@ -105,6 +106,12 @@ void Images::remove( uint32_t id )
   }
 }
 
+/* What an image counts against the limit of all images. */
+static size_t charge( const Image &image )
+{
+  return std::max( decoded_size( image.base64 ), Images::MIN_CHARGE );
+}
+
 void Images::put( const Image &image )
 {
   for ( auto i = images.begin(); i != images.end(); i++ ) {
@@ -117,10 +124,10 @@ void Images::put( const Image &image )
 
   size_t bytes = 0;
   for ( const auto &stored : images ) {
-    bytes += decoded_size( stored->base64 );
+    bytes += charge( *stored );
   }
   while ( bytes > max_bytes ) {
-    bytes -= decoded_size( images.front()->base64 );
+    bytes -= charge( *images.front() );
     remove( images.front()->id );
   }
 }
@@ -307,7 +314,10 @@ std::string GraphicsReceiver::apply( const std::string &body, Images &images )
   }
   Transmission done = *transmission;
   transmission.reset();
-  if ( done.image && !is_base64( done.image->base64 ) ) {
+  if ( done.image && done.image->base64.empty() ) {
+    done.image.reset();
+    done.error = "EINVAL:the image has no data";
+  } else if ( done.image && !is_base64( done.image->base64 ) ) {
     done.image.reset();
     done.error = "EINVAL:the payload is not base64";
   } else if ( done.image && decoded_size( done.image->base64 ) > MAX_IMAGE_BYTES ) {

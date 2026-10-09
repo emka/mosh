@@ -427,7 +427,7 @@ static Terminal::Image image_of_eight_bytes( uint32_t id )
 static void evicts_the_oldest_image_past_the_table_limit( void )
 {
   // Given
-  Terminal::Images images( 20 );
+  Terminal::Images images( 2 * Terminal::Images::MIN_CHARGE );
   images.put( image_of_eight_bytes( 1 ) );
   images.put( image_of_eight_bytes( 2 ) );
 
@@ -441,7 +441,7 @@ static void evicts_the_oldest_image_past_the_table_limit( void )
 static void counts_a_replaced_image_as_the_newest( void )
 {
   // Given
-  Terminal::Images images( 20 );
+  Terminal::Images images( 2 * Terminal::Images::MIN_CHARGE );
   images.put( image_of_eight_bytes( 1 ) );
   images.put( image_of_eight_bytes( 2 ) );
   images.put( image_of_eight_bytes( 1 ) );
@@ -609,6 +609,21 @@ static void forgets_an_unfinished_transmission_on_a_full_reset( void )
   fatal_assert( term.get_fb().image_count() == 0 );
 }
 
+static void counts_every_image_as_at_least_the_minimum_charge( void )
+{
+  // Given
+  Terminal::Images images( 3 * Terminal::Images::MIN_CHARGE );
+  images.put( image_of_eight_bytes( 1 ) );
+  images.put( image_of_eight_bytes( 2 ) );
+  images.put( image_of_eight_bytes( 3 ) );
+
+  // When
+  images.put( image_of_eight_bytes( 4 ) );
+
+  // Then
+  fatal_assert( !images.get( 1 ) && images.get( 2 ) && images.get( 3 ) && images.get( 4 ) );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -653,5 +668,6 @@ int main( void )
   ignores_actions_other_than_transmit_place_and_delete();
   deletes_after_an_abandoned_transmission();
   forgets_an_unfinished_transmission_on_a_full_reset();
+  counts_every_image_as_at_least_the_minimum_charge();
   return 0;
 }

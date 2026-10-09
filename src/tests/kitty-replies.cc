@@ -178,6 +178,18 @@ static void answers_a_new_command_after_an_abandoned_transmission( void )
   fatal_assert( reply == "\033_Gi=31;OK\033\\" && term.get_fb().image_count() == 0 );
 }
 
+static void refuses_an_empty_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  const std::string reply = term.act( "\033_Ga=t,i=7,f=100\033\\" );
+
+  // Then
+  fatal_assert( reply.rfind( "\033_Gi=7;EINVAL:", 0 ) == 0 && term.get_fb().image_count() == 0 );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -195,5 +207,6 @@ int main( void )
   answers_nothing_without_an_image_id();
   tells_programs_that_direct_placements_are_not_supported();
   answers_a_new_command_after_an_abandoned_transmission();
+  refuses_an_empty_image();
   return 0;
 }

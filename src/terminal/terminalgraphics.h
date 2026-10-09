@@ -81,6 +81,10 @@ namespace Terminal {
     /* The most all images together may take once decoded from base64. */
     static const size_t MAX_BYTES = 16 * 1024 * 1024;
 
+    /* The least an image counts against MAX_BYTES, so that tiny images
+       cannot pile up: at most 1024 fit. */
+    static const size_t MIN_CHARGE = 16 * 1024;
+
     Images( size_t s_max_bytes = MAX_BYTES ) : images(), placements(), max_bytes( s_max_bytes ) {}
 
     const Image *get( uint32_t id ) const;
@@ -88,7 +92,7 @@ namespace Terminal {
     const list_type & list( void ) const { return images; }
     std::optional<ImagePlacement> placement( uint32_t id ) const;
     /* Stores an image, replacing one with the same id, and evicts the oldest
-       images while all of them take more than the limit. */
+       images while all of them count for more than the limit. */
     void put( const Image &image );
     void remove( uint32_t id );
     void unplace_all( void ) { placements.clear(); }
