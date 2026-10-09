@@ -418,6 +418,7 @@ static int run_server( const char *desired_ip, const char *desired_port,
     window_size.ws_col = 80;
     window_size.ws_row = 24;
   }
+  Terminal::set_pixel_size( window_size );
 
   /* open parser and terminal */
   Terminal::Complete terminal( window_size.ws_col, window_size.ws_row );
@@ -756,6 +757,7 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 	      }
 	      window_size.ws_col = res.width;
 	      window_size.ws_row = res.height;
+	      Terminal::set_pixel_size( window_size );
 	      if ( ioctl( host_fd, TIOCSWINSZ, &window_size ) < 0 ) {
 		perror( "ioctl TIOCSWINSZ" );
 		network.start_shutdown();

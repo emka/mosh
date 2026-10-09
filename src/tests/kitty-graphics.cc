@@ -33,6 +33,8 @@
 /* Kitty graphics commands kept as framebuffer state. */
 
 #include <locale.h>
+#include <string.h>
+#include <sys/ioctl.h>
 
 #include <string>
 
@@ -638,6 +640,22 @@ static void stores_base64_sent_without_padding_padded( void )
   fatal_assert( two_short && two_short->base64 == "AAAAAA==" && one_short && one_short->base64 == "AAAAAAA=" );
 }
 
+static void gives_the_window_a_size_in_pixels( void )
+{
+  // Given
+  struct winsize size;
+  memset( &size, 0, sizeof size );
+  size.ws_col = 80;
+  size.ws_row = 24;
+
+  // When
+  Terminal::set_pixel_size( size );
+
+  // Then
+  fatal_assert( size.ws_xpixel == 80 * Terminal::CELL_WIDTH_PIXELS && size.ws_ypixel == 24 * Terminal::CELL_HEIGHT_PIXELS
+                && Terminal::CELL_WIDTH_PIXELS * 2 == Terminal::CELL_HEIGHT_PIXELS );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -684,5 +702,6 @@ int main( void )
   forgets_an_unfinished_transmission_on_a_full_reset();
   counts_every_image_as_at_least_the_minimum_charge();
   stores_base64_sent_without_padding_padded();
+  gives_the_window_a_size_in_pixels();
   return 0;
 }

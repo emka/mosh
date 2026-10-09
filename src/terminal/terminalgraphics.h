@@ -34,6 +34,7 @@
 #define TERMINALGRAPHICS_HPP
 
 #include <stdint.h>
+#include <sys/ioctl.h>
 
 #include <map>
 #include <optional>
@@ -135,6 +136,21 @@ namespace Terminal {
     /* Returns the reply for the program, empty when there is none. */
     std::string apply( const std::string &body, Images &images );
   };
+}
+
+namespace Terminal {
+  /* The size of a cell in pixels, as reported to programs. The client's
+     real cell size is unknown here; programs that place images by
+     placeholder cells, such as kitten icat, only need the proportions. */
+  const int CELL_WIDTH_PIXELS = 10;
+  const int CELL_HEIGHT_PIXELS = 20;
+
+  /* Sets the pixel size of a window from its size in cells. */
+  inline void set_pixel_size( struct winsize &size )
+  {
+    size.ws_xpixel = size.ws_col * CELL_WIDTH_PIXELS;
+    size.ws_ypixel = size.ws_row * CELL_HEIGHT_PIXELS;
+  }
 }
 
 #endif
