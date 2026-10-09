@@ -306,7 +306,7 @@ static void ignores_a_placement_of_an_unknown_image( void )
   fatal_assert( term.get_fb().image_count() == 0 );
 }
 
-static void keeps_no_direct_placement( void )
+static void refuses_a_direct_placement( void )
 {
   // Given
   Terminal::Complete term( 80, 24 );
@@ -315,8 +315,7 @@ static void keeps_no_direct_placement( void )
   term.act( "\033_Ga=T,i=1,c=4,r=2,f=100;AAAA\033\\" );
 
   // Then
-  const Terminal::Image *image = term.get_fb().get_image( 1 );
-  fatal_assert( image && !term.get_fb().get_placement( 1 ) );
+  fatal_assert( term.get_fb().image_count() == 0 );
 }
 
 static void deletes_the_placement_of_one_image( void )
@@ -606,7 +605,7 @@ int main( void )
   places_a_stored_image();
   keeps_only_the_latest_placement_of_an_image();
   ignores_a_placement_of_an_unknown_image();
-  keeps_no_direct_placement();
+  refuses_a_direct_placement();
   deletes_the_placement_of_one_image();
   deletes_one_image();
   deletes_every_placement();

@@ -151,6 +151,20 @@ static void answers_nothing_without_an_image_id( void )
   fatal_assert( reply.empty() );
 }
 
+static void tells_programs_that_direct_placements_are_not_supported( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;AAAA\033\\" );
+
+  // When
+  const std::string reply = term.act( "\033_Ga=T,i=7,f=100;AAAA\033\\" ) + term.act( "\033_Ga=p,i=1\033\\" );
+
+  // Then
+  fatal_assert( reply.rfind( "\033_Gi=7;ENOTSUPPORTED:", 0 ) == 0
+                && reply.find( "\033_Gi=1;ENOTSUPPORTED:" ) != std::string::npos );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -166,5 +180,6 @@ int main( void )
   answers_a_query_for_files_with_an_error();
   answers_a_chunked_transmission_once_it_is_complete();
   answers_nothing_without_an_image_id();
+  tells_programs_that_direct_placements_are_not_supported();
   return 0;
 }

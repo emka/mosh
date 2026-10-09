@@ -186,9 +186,12 @@ static Image image_from( Keys &keys )
   return image;
 }
 
+static const char *const NOT_VIRTUAL = "ENOTSUPPORTED:only virtual placements (U=1) are supported";
+
 /* Why a transmission is not one this terminal keeps, as kitty reports it,
    or empty when it is: identified by i, sent directly in the command rather
-   than as a file, and either PNG or raw pixels of a given size. */
+   than as a file, either PNG or raw pixels of a given size, and, when it is
+   placed at once, placed virtually. */
 static std::string unsupported( Keys &keys )
 {
   const Image image = image_from( keys );
@@ -206,6 +209,9 @@ static std::string unsupported( Keys &keys )
   }
   if ( image.format != 100 && ( image.width <= 0 || image.height <= 0 ) ) {
     return "EINVAL:raw pixels need s and v";
+  }
+  if ( keys[ "a" ] == "T" && keys[ "U" ] != "1" ) {
+    return NOT_VIRTUAL;
   }
   return "";
 }
@@ -240,10 +246,16 @@ std::string GraphicsReceiver::apply( const std::string &body, Images &images )
   if ( !transmission ) {
     const std::string action = keys[ "a" ].empty() ? "t" : keys[ "a" ];
     if ( action == "p" ) {
+      Transmission placing;
+      placing.id = image_id( keys );
+      placing.query = false;
+      placing.quiet = atoi( keys[ "q" ].c_str() );
       if ( keys[ "U" ] == "1" ) {
-        images.place( image_id( keys ), placement_from( keys ) );
+        images.place( placing.id, placement_from( keys ) );
+        return "";
       }
-      return "";
+      placing.error = NOT_VIRTUAL;
+      return answer( placing );
     }
     if ( action == "d" ) {
       delete_images( keys, images );
