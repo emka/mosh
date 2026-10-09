@@ -656,6 +656,20 @@ static void gives_the_window_a_size_in_pixels( void )
                 && Terminal::CELL_WIDTH_PIXELS * 2 == Terminal::CELL_HEIGHT_PIXELS );
 }
 
+static void joins_chunks_that_repeat_the_action( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=T,q=2,f=100,m=1,U=1,c=1,r=1,i=7;AAAA\033\\" );
+
+  // When
+  term.act( "\033_Ga=T,q=2,m=1;BBBB\033\\\033_Ga=T,q=2;CCCC\033\\" );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 7 );
+  fatal_assert( term.get_fb().image_count() == 1 && image && image->base64 == "AAAABBBBCCCC" );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -703,5 +717,6 @@ int main( void )
   counts_every_image_as_at_least_the_minimum_charge();
   stores_base64_sent_without_padding_padded();
   gives_the_window_a_size_in_pixels();
+  joins_chunks_that_repeat_the_action();
   return 0;
 }

@@ -239,10 +239,13 @@ static std::string answer( const Transmission &done )
   return reply( done.id, done.error.empty() ? "OK" : done.error );
 }
 
-static bool is_continuation( const Keys &keys )
+/* Whether a command continues a transmission: it carries only m and q,
+   and possibly repeats the transmission's action, as kitten icat does. */
+static bool is_continuation( const Keys &keys, const Transmission &transmission )
 {
   for ( const auto &key : keys ) {
-    if ( key.first != "m" && key.first != "q" ) {
+    const bool repeated_action = key.first == "a" && key.second == transmission.action;
+    if ( key.first != "m" && key.first != "q" && !repeated_action ) {
       return false;
     }
   }
@@ -260,9 +263,9 @@ std::string GraphicsReceiver::apply( const std::string &body, Images &images )
   Keys keys = parse_keys( body.substr( 1, semicolon == std::string::npos ? std::string::npos : semicolon - 1 ) );
   std::string payload = semicolon == std::string::npos ? std::string() : body.substr( semicolon + 1 );
 
-  /* A later chunk carries only m and q; anything else starts a new command
-     and abandons a transmission the program never finished. */
-  if ( transmission && !is_continuation( keys ) ) {
+  /* Anything but a later chunk starts a new command and abandons a
+     transmission the program never finished. */
+  if ( transmission && !is_continuation( keys, *transmission ) ) {
     transmission.reset();
   }
 
@@ -289,6 +292,7 @@ std::string GraphicsReceiver::apply( const std::string &body, Images &images )
     }
     Transmission started;
     started.id = image_id( keys );
+    started.action = action;
     started.query = action == "q";
     started.quiet = atoi( keys[ "q" ].c_str() );
     started.error = unsupported( keys );

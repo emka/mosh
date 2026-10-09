@@ -107,6 +107,7 @@ namespace Terminal {
   /* An image being received, possibly in chunks. */
   struct Transmission {
     uint32_t id;
+    std::string action;                      /* a: t, T or q */
     bool query;                              /* a=q: checked and answered, never stored */
     int quiet;                               /* q: 1 suppresses OK, 2 every reply */
     std::optional<Image> image;              /* empty once the transmission is refused */
