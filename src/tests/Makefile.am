@@ -38,8 +38,8 @@ displaytests = \
 	unicode-later-combining.test \
 	window-resize.test
 
-check_PROGRAMS = ocb-aes encrypt-decrypt base64 nonce-incr inpty is-utf8-locale kitty-graphics
-TESTS = ocb-aes encrypt-decrypt base64 nonce-incr kitty-graphics local.test $(displaytests)
+check_PROGRAMS = ocb-aes encrypt-decrypt base64 nonce-incr inpty is-utf8-locale kitty-graphics kitty-display
+TESTS = ocb-aes encrypt-decrypt base64 nonce-incr kitty-graphics kitty-display local.test $(displaytests)
 XFAIL_TESTS = \
 	e2e-failure.test \
 	emulation-attributes-256color8.test
@@ -67,6 +67,10 @@ nonce_incr_LDADD = ../network/libmoshnetwork.a ../crypto/libmoshcrypto.a ../util
 kitty_graphics_SOURCES = kitty-graphics.cc
 kitty_graphics_CPPFLAGS = -I$(srcdir)/../terminal -I$(srcdir)/../statesync -I$(srcdir)/../util -I../protobufs $(protobuf_CFLAGS)
 kitty_graphics_LDADD = ../statesync/libmoshstatesync.a ../terminal/libmoshterminal.a ../protobufs/libmoshprotos.a ../util/libmoshutil.a $(TINFO_LIBS) $(protobuf_LIBS)
+
+kitty_display_SOURCES = kitty-display.cc
+kitty_display_CPPFLAGS = $(kitty_graphics_CPPFLAGS)
+kitty_display_LDADD = $(kitty_graphics_LDADD)
 
 inpty_SOURCES = inpty.cc
 inpty_CPPFLAGS = -I$(srcdir)/../util

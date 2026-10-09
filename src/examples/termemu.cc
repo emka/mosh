@@ -236,7 +236,7 @@ static void emulate_terminal( int fd )
   Terminal::Framebuffer state( window_size.ws_col, window_size.ws_row );
 
   /* open display */
-  Terminal::Display display( true ); /* use TERM to initialize */
+  Terminal::Display display( true, false ); /* use TERM to initialize */
 
   Select &sel = Select::get_instance();
   sel.add_fd( STDIN_FILENO );

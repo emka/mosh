@@ -32,6 +32,8 @@
 
 #include <stdio.h>
 
+#include <algorithm>
+
 #include "terminaldisplay.h"
 #include "terminalframebuffer.h"
 
@@ -56,6 +58,81 @@ std::string Display::close() const
 		      "\033[?1003l\033[?1002l\033[?1001l\033[?1000l"
 		      "\033[?1015l\033[?1006l\033[?1005l" ) +
     std::string( rmcup ? rmcup : "" );
+}
+
+/* The most base64 one graphics command carries; the client discards longer ones. */
+static const size_t IMAGE_CHUNK_BYTES = 4096;
+
+/* Sends an image with the Kitty graphics protocol, in chunks the client
+   accepts, telling the terminal that receives it not to reply. */
+static void append_image( FrameState &frame, const Image &image )
+{
+  char keys[ 128 ];
+  snprintf( keys, sizeof keys, "\033_Ga=t,i=%u,f=%d,q=2", image.id, image.format );
+  frame.append( keys );
+  if ( image.width > 0 && image.height > 0 ) {
+    snprintf( keys, sizeof keys, ",s=%d,v=%d", image.width, image.height );
+    frame.append( keys );
+  }
+  if ( image.zlib ) {
+    frame.append( ",o=z" );
+  }
+
+  const std::string &base64 = image.base64;
+  for ( size_t start = 0; start == 0 || start < base64.size(); start += IMAGE_CHUNK_BYTES ) {
+    const bool last = start + IMAGE_CHUNK_BYTES >= base64.size();
+    if ( start > 0 ) {
+      frame.append( "\033_Gq=2" );
+    }
+    if ( start > 0 || !last ) {
+      frame.append( last ? ",m=0" : ",m=1" );
+    }
+    frame.append( ';' );
+    frame.append_string( base64.substr( start, IMAGE_CHUNK_BYTES ) );
+    frame.append( "\033\\" );
+  }
+}
+
+/* Places an image virtually, for the client to show in placeholder cells. */
+static void append_placement( FrameState &frame, uint32_t id, const ImagePlacement &placement )
+{
+  char command[ 128 ];
+  snprintf( command, sizeof command, "\033_Ga=p,U=1,i=%u,p=%u,c=%d,r=%d,q=2\033\\",
+            id, placement.placement_id, placement.cols, placement.rows );
+  frame.append( command );
+}
+
+/* Deletes an image (scope I) or only its placement (scope i). */
+static void append_delete( FrameState &frame, char scope, uint32_t id )
+{
+  char command[ 64 ];
+  snprintf( command, sizeof command, "\033_Ga=d,d=%c,i=%u,q=2\033\\", scope, id );
+  frame.append( command );
+}
+
+/* Brings the client's images from what it has to what the terminal holds:
+   deletes first, then new images, then new placements. */
+static void append_image_changes( FrameState &frame, const Images &last, const Images &images )
+{
+  for ( const auto &image : last.list() ) {
+    if ( !images.get( image->id ) ) {
+      append_delete( frame, 'I', image->id );
+    } else if ( last.placement( image->id ) && !images.placement( image->id ) ) {
+      append_delete( frame, 'i', image->id );
+    }
+  }
+  for ( const auto &image : images.list() ) {
+    const Images::list_type &sent = last.list();
+    if ( std::find( sent.begin(), sent.end(), image ) == sent.end() ) {
+      append_image( frame, *image );
+    }
+  }
+  for ( const auto &image : images.list() ) {
+    const std::optional<ImagePlacement> placement = images.placement( image->id );
+    if ( placement && placement != last.placement( image->id ) ) {
+      append_placement( frame, image->id, *placement );
+    }
+  }
 }
 
 std::string Display::new_frame( bool initialized, const Framebuffer &last, const Framebuffer &f ) const
@@ -120,6 +197,11 @@ std::string Display::new_frame( bool initialized, const Framebuffer &last, const
       frame.append( *i );
     }
     frame.append( '\007' );
+  }
+
+  /* have images been sent, placed or deleted? */
+  if ( emits_images ) {
+    append_image_changes( frame, frame.last_frame.get_images(), f.get_images() );
   }
 
   /* has reverse video state changed? */

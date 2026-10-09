@@ -60,7 +60,7 @@ namespace Terminal {
     static const int ECHO_TIMEOUT = 50; /* for late ack */
 
   public:
-    Complete( size_t width, size_t height ) : parser(), terminal( width, height ), display( false ),
+    Complete( size_t width, size_t height ) : parser(), terminal( width, height ), display( false, true ),
 					      actions(), input_history(), echo_ack( 0 ) {}
     
     std::string act( const std::string &str );

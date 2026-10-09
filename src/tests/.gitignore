@@ -6,6 +6,7 @@
 /inpty
 /is-utf8-locale
 /kitty-graphics
+/kitty-display
 /*.d/
 *.log
 *.trs
