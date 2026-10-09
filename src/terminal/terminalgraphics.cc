@@ -314,6 +314,14 @@ std::string GraphicsReceiver::apply( const std::string &body, Images &images )
   }
   Transmission done = *transmission;
   transmission.reset();
+  if ( done.image ) {
+    /* Programs such as kitten icat leave out the padding, as kitty allows;
+       restoring it keeps what is stored and sent on valid base64. */
+    const size_t missing = ( 4 - done.image->base64.size() % 4 ) % 4;
+    if ( missing <= 2 ) { /* three missing characters cannot be padding */
+      done.image->base64.append( missing, '=' );
+    }
+  }
   if ( done.image && done.image->base64.empty() ) {
     done.image.reset();
     done.error = "EINVAL:the image has no data";

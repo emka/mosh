@@ -624,6 +624,20 @@ static void counts_every_image_as_at_least_the_minimum_charge( void )
   fatal_assert( !images.get( 1 ) && images.get( 2 ) && images.get( 3 ) && images.get( 4 ) );
 }
 
+static void stores_base64_sent_without_padding_padded( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=t,i=1,f=100;AAAAAA\033\\\033_Ga=t,i=2,f=100;AAAAAAA\033\\" );
+
+  // Then
+  const Terminal::Image *two_short = term.get_fb().get_image( 1 );
+  const Terminal::Image *one_short = term.get_fb().get_image( 2 );
+  fatal_assert( two_short && two_short->base64 == "AAAAAA==" && one_short && one_short->base64 == "AAAAAAA=" );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -669,5 +683,6 @@ int main( void )
   deletes_after_an_abandoned_transmission();
   forgets_an_unfinished_transmission_on_a_full_reset();
   counts_every_image_as_at_least_the_minimum_charge();
+  stores_base64_sent_without_padding_padded();
   return 0;
 }
