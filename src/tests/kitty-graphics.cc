@@ -40,6 +40,13 @@
 #include "fatal_assert.h"
 #include "locale_utils.h"
 
+static std::string cell_text( const Terminal::Framebuffer &fb, int row, int col )
+{
+  std::string text;
+  fb.get_cell( row, col )->print_grapheme( text );
+  return text;
+}
+
 static bool screen_is_blank( const Terminal::Framebuffer &fb )
 {
   for ( int row = 0; row < fb.ds.get_height(); row++ ) {
@@ -50,6 +57,34 @@ static bool screen_is_blank( const Terminal::Framebuffer &fb )
     }
   }
   return true;
+}
+
+/* Base64 that decodes to the given number of zero bytes. */
+static std::string base64_of_zeros( size_t bytes )
+{
+  std::string encoded( bytes / 3 * 4, 'A' );
+  if ( bytes % 3 == 1 ) {
+    encoded += "AA==";
+  } else if ( bytes % 3 == 2 ) {
+    encoded += "AAA=";
+  }
+  return encoded;
+}
+
+/* Sends an image to the terminal in chunks of 4096 base64 bytes. */
+static void transmit_in_chunks( Terminal::Complete &term, uint32_t id, const std::string &base64 )
+{
+  for ( size_t start = 0; start < base64.size(); start += 4096 ) {
+    const bool first = start == 0;
+    const bool last = start + 4096 >= base64.size();
+    std::string command = "\033_G";
+    if ( first ) {
+      command += "a=t,f=100,i=" + std::to_string( id ) + ",";
+    }
+    command += last ? "m=0;" : "m=1;";
+    command += base64.substr( start, 4096 ) + "\033\\";
+    term.act( command );
+  }
 }
 
 static void stores_an_image_transmitted_in_one_command( void )
@@ -352,6 +387,202 @@ static void deletes_every_placement_when_no_scope_is_given( void )
   fatal_assert( image && !image->placement );
 }
 
+static void refuses_an_image_over_one_mebibyte( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  transmit_in_chunks( term, 1, base64_of_zeros( 1024 * 1024 + 1 ) );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void stores_an_image_of_exactly_one_mebibyte( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  transmit_in_chunks( term, 1, base64_of_zeros( 1024 * 1024 ) );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 1 );
+  fatal_assert( image && image->base64 == base64_of_zeros( 1024 * 1024 ) );
+}
+
+static Terminal::Image image_of_eight_bytes( uint32_t id )
+{
+  Terminal::Image image;
+  image.id = id;
+  image.format = 100;
+  image.width = 0;
+  image.height = 0;
+  image.zlib = false;
+  image.base64 = base64_of_zeros( 8 );
+  return image;
+}
+
+static void evicts_the_oldest_image_past_the_table_limit( void )
+{
+  // Given
+  Terminal::Images images( 20 );
+  images.put( image_of_eight_bytes( 1 ) );
+  images.put( image_of_eight_bytes( 2 ) );
+
+  // When
+  images.put( image_of_eight_bytes( 3 ) );
+
+  // Then
+  fatal_assert( !images.get( 1 ) && images.get( 2 ) && images.get( 3 ) );
+}
+
+static void counts_a_replaced_image_as_the_newest( void )
+{
+  // Given
+  Terminal::Images images( 20 );
+  images.put( image_of_eight_bytes( 1 ) );
+  images.put( image_of_eight_bytes( 2 ) );
+  images.put( image_of_eight_bytes( 1 ) );
+
+  // When
+  images.put( image_of_eight_bytes( 3 ) );
+
+  // Then
+  fatal_assert( images.get( 1 ) && !images.get( 2 ) && images.get( 3 ) );
+}
+
+static void limits_an_image_to_one_mebibyte_and_all_images_to_sixteen( void )
+{
+  // Given
+  const Terminal::Images images;
+
+  // When
+  const size_t table_limit = Terminal::Images::MAX_BYTES;
+  const size_t image_limit = Terminal::GraphicsReceiver::MAX_IMAGE_BYTES;
+
+  // Then
+  fatal_assert( image_limit == 1024 * 1024 && table_limit == 16 * 1024 * 1024 && images.size() == 0 );
+}
+
+static void drops_a_command_longer_than_any_image_needs( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  std::string padding;
+  for ( int i = 0; i < 512 * 1024; i++ ) {
+    padding += ",x=1";
+  }
+
+  // When
+  term.act( "\033_Ga=t,i=1,f=100" + padding + ";AAAA\033\\hi" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 && cell_text( term.get_fb(), 0, 0 ) == "h" );
+}
+
+static void refuses_a_payload_that_is_not_base64( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=t,i=1,f=100;@@@@\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void refuses_padding_before_the_last_chunk( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100,m=1;AA==\033\\" );
+
+  // When
+  term.act( "\033_Gm=0;AA==\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void refuses_an_image_without_an_id( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=t,f=100;AAAA\033\\\033_Ga=t,i=0,f=100;AAAA\033\\\033_Ga=t,I=5,f=100;AAAA\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void refuses_images_sent_as_files( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=t,t=f,i=1,f=100;L3RtcC9h\033\\\033_Ga=t,t=s,i=2,f=100;L3RtcC9h\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void refuses_raw_pixels_without_a_size_and_unknown_formats( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=t,i=1,f=24,s=1;AAAA\033\\\033_Ga=t,i=2,f=32,v=1;AAAA\033\\\033_Ga=t,i=3,f=99;AAAA\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void takes_an_image_without_a_format_as_rgba( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=t,i=1,s=1,v=1;AAAAAA==\033\\" );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 1 );
+  fatal_assert( image && image->format == 32 );
+}
+
+static void drops_every_image_on_a_full_reset( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;AAAA\033\\" );
+
+  // When
+  term.act( "\033c" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void ignores_actions_other_than_transmit_place_and_delete( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;AAAA\033\\" );
+
+  // When
+  term.act( "\033_Ga=f,i=1,f=100;BBBB\033\\" );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 1 );
+  fatal_assert( image && image->base64 == "AAAA" );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -380,5 +611,19 @@ int main( void )
   deletes_every_placement();
   deletes_every_image();
   deletes_every_placement_when_no_scope_is_given();
+  refuses_an_image_over_one_mebibyte();
+  stores_an_image_of_exactly_one_mebibyte();
+  evicts_the_oldest_image_past_the_table_limit();
+  counts_a_replaced_image_as_the_newest();
+  limits_an_image_to_one_mebibyte_and_all_images_to_sixteen();
+  drops_a_command_longer_than_any_image_needs();
+  refuses_a_payload_that_is_not_base64();
+  refuses_padding_before_the_last_chunk();
+  refuses_an_image_without_an_id();
+  refuses_images_sent_as_files();
+  refuses_raw_pixels_without_a_size_and_unknown_formats();
+  takes_an_image_without_a_format_as_rgba();
+  drops_every_image_on_a_full_reset();
+  ignores_actions_other_than_transmit_place_and_delete();
   return 0;
 }

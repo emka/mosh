@@ -39,6 +39,7 @@
 #include "terminaldispatcher.h"
 #include "parseraction.h"
 #include "terminalframebuffer.h"
+#include "terminalgraphics.h"
 
 using namespace Terminal;
 
@@ -46,7 +47,7 @@ static const size_t MAXIMUM_CLIPBOARD_SIZE = 16*1024;
 
 Dispatcher::Dispatcher()
   : params(), parsed_params(), parsed( false ), dispatch_chars(),
-    OSC_string(), APC_string(), terminal_to_host()
+    OSC_string(), APC_string(), APC_too_long( false ), terminal_to_host()
 {}
 
 void Dispatcher::newparamchar( const Parser::Param *act )
@@ -249,11 +250,20 @@ void Dispatcher::OSC_start( const Parser::OSC_Start *act __attribute((unused)) )
 void Dispatcher::APC_start( const Parser::APC_Start *act __attribute((unused)) )
 {
   APC_string.clear();
+  APC_too_long = false;
 }
 
 void Dispatcher::APC_put( const Parser::APC_Put *act )
 {
   assert( act->char_present );
+  if ( APC_too_long ) {
+    return;
+  }
+  if ( APC_string.size() >= GraphicsReceiver::MAX_COMMAND_BYTES ) {
+    APC_string.clear();
+    APC_too_long = true;
+    return;
+  }
   APC_string.push_back( static_cast<char>( act->ch ) );
 }
 

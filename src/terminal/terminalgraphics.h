@@ -62,13 +62,19 @@ namespace Terminal {
   /* The images a terminal holds. Copies share each image. */
   class Images {
   private:
-    std::vector< shared::shared_ptr<const Image> > images;
+    std::vector< shared::shared_ptr<const Image> > images; /* oldest first */
+    size_t max_bytes;
 
   public:
-    Images() : images() {}
+    /* The most all images together may take once decoded from base64. */
+    static const size_t MAX_BYTES = 16 * 1024 * 1024;
+
+    Images( size_t s_max_bytes = MAX_BYTES ) : images(), max_bytes( s_max_bytes ) {}
 
     const Image *get( uint32_t id ) const;
     size_t size( void ) const { return images.size(); }
+    /* Stores an image, replacing one with the same id, and evicts the oldest
+       images while all of them take more than the limit. */
     void put( const Image &image );
     void remove( uint32_t id );
     void unplace_all( void );
@@ -85,9 +91,19 @@ namespace Terminal {
   class GraphicsReceiver {
   private:
     std::optional<Image> upload;
+    bool refused; /* the transmission in progress is dropped until its last chunk */
 
   public:
-    GraphicsReceiver() : upload() {}
+    /* The most an image may take once decoded from base64. */
+    static const size_t MAX_IMAGE_BYTES = 1024 * 1024;
+
+    /* The longest base64 that decodes to at most MAX_IMAGE_BYTES. */
+    static const size_t MAX_IMAGE_BASE64 = ( MAX_IMAGE_BYTES + 2 ) / 3 * 4;
+
+    /* The longest command worth reading: a whole image plus room for its keys. */
+    static const size_t MAX_COMMAND_BYTES = MAX_IMAGE_BASE64 + 4096;
+
+    GraphicsReceiver() : upload(), refused( false ) {}
 
     void apply( const std::string &body, Images &images );
   };

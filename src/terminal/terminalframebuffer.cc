@@ -385,6 +385,7 @@ void Framebuffer::reset( void )
   rows = rows_type( height, newrow() );
   window_title.clear();
   clipboard.clear();
+  images.clear();
   /* do not reset bell_count */
 }
 

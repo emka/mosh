@@ -90,6 +90,7 @@ namespace Terminal {
     std::string dispatch_chars;
     std::vector<wchar_t> OSC_string; /* only used to set the window title */
     std::string APC_string; /* the body of the application program command being received */
+    bool APC_too_long; /* the body outgrew the longest command worth reading and is dropped */
 
     void parse_params( void );
 

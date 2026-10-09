@@ -30,6 +30,7 @@
     also delete it here.
 */
 
+#include <ctype.h>
 #include <stdlib.h>
 
 #include <map>
@@ -37,6 +38,33 @@
 #include "terminalgraphics.h"
 
 using namespace Terminal;
+
+/* The number of bytes valid base64 decodes to. */
+static size_t decoded_size( const std::string &base64 )
+{
+  size_t padding = 0;
+  while ( padding < 2 && padding < base64.size() && base64[ base64.size() - 1 - padding ] == '=' ) {
+    padding++;
+  }
+  return base64.size() / 4 * 3 - padding;
+}
+
+/* Whether a whole payload is base64 that decodes to whole bytes. */
+static bool is_base64( const std::string &text )
+{
+  if ( text.size() % 4 != 0 ) {
+    return false;
+  }
+  for ( size_t i = 0; i < text.size(); i++ ) {
+    const char c = text[ i ];
+    const bool padding = c == '=' && i + 2 >= text.size()
+      && ( i + 1 == text.size() || text[ i + 1 ] == '=' );
+    if ( !isalnum( static_cast<unsigned char>( c ) ) && c != '+' && c != '/' && !padding ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 const Image *Images::get( uint32_t id ) const
 {
@@ -85,6 +113,15 @@ void Images::put( const Image &image )
 {
   remove( image.id );
   images.push_back( shared::make_shared<const Image>( image ) );
+
+  size_t bytes = 0;
+  for ( const auto &stored : images ) {
+    bytes += decoded_size( stored->base64 );
+  }
+  while ( bytes > max_bytes ) {
+    bytes -= decoded_size( images.front()->base64 );
+    images.erase( images.begin() );
+  }
 }
 
 typedef std::map<std::string, std::string> Keys;
@@ -140,7 +177,7 @@ static Image image_from( Keys &keys, const std::string &payload )
 {
   Image image;
   image.id = image_id( keys );
-  image.format = atoi( keys[ "f" ].c_str() );
+  image.format = keys[ "f" ].empty() ? 32 : atoi( keys[ "f" ].c_str() );
   image.width = atoi( keys[ "s" ].c_str() );
   image.height = atoi( keys[ "v" ].c_str() );
   image.zlib = keys[ "o" ] == "z";
@@ -149,6 +186,18 @@ static Image image_from( Keys &keys, const std::string &payload )
     image.placement = placement_from( keys );
   }
   return image;
+}
+
+/* Whether a transmission is one this terminal keeps: identified by i, sent
+   directly in the command rather than as a file, and either PNG or raw
+   pixels of a given size. */
+static bool is_supported( Keys &keys )
+{
+  const Image image = image_from( keys, "" );
+  const bool sized = image.width > 0 && image.height > 0;
+  return image.id != 0 && !keys.count( "I" )
+    && ( keys[ "t" ].empty() || keys[ "t" ] == "d" )
+    && ( image.format == 100 || ( ( image.format == 24 || image.format == 32 ) && sized ) );
 }
 
 void GraphicsReceiver::apply( const std::string &body, Images &images )
@@ -160,8 +209,10 @@ void GraphicsReceiver::apply( const std::string &body, Images &images )
   Keys keys = parse_keys( body.substr( 1, semicolon == std::string::npos ? std::string::npos : semicolon - 1 ) );
   std::string payload = semicolon == std::string::npos ? std::string() : body.substr( semicolon + 1 );
 
-  if ( upload ) {
-    upload->base64 += payload;
+  if ( upload || refused ) {
+    if ( upload ) {
+      upload->base64 += payload;
+    }
   } else if ( keys[ "a" ] == "p" ) {
     if ( keys[ "U" ] == "1" ) {
       images.place( image_id( keys ), placement_from( keys ) );
@@ -170,12 +221,24 @@ void GraphicsReceiver::apply( const std::string &body, Images &images )
   } else if ( keys[ "a" ] == "d" ) {
     delete_images( keys, images );
     return;
+  } else if ( !keys[ "a" ].empty() && keys[ "a" ] != "t" && keys[ "a" ] != "T" ) {
+    return;
+  } else if ( !is_supported( keys ) ) {
+    refused = true;
   } else {
     upload = image_from( keys, payload );
   }
 
-  if ( keys[ "m" ] != "1" ) {
-    images.put( *upload );
+  if ( upload && upload->base64.size() > MAX_IMAGE_BASE64 ) {
     upload.reset();
+    refused = true;
+  }
+
+  if ( keys[ "m" ] != "1" ) {
+    if ( upload && is_base64( upload->base64 ) && decoded_size( upload->base64 ) <= MAX_IMAGE_BYTES ) {
+      images.put( *upload );
+    }
+    upload.reset();
+    refused = false;
   }
 }
