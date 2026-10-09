@@ -35,6 +35,7 @@
 
 #include <stdint.h>
 
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -48,6 +49,12 @@ namespace Terminal {
     uint32_t placement_id;
     int cols;
     int rows;
+
+    bool operator==( const ImagePlacement &x ) const
+    {
+      return placement_id == x.placement_id && cols == x.cols && rows == x.rows;
+    }
+    bool operator!=( const ImagePlacement &x ) const { return !operator==( x ); }
   };
 
   struct Image {
@@ -56,33 +63,40 @@ namespace Terminal {
     int width, height;   /* s and v; 0 when absent */
     bool zlib;           /* o=z */
     std::string base64;  /* the whole payload, as received */
-    std::optional<ImagePlacement> placement;
   };
 
-  /* The images a terminal holds. Copies share each image. */
+  /* The images a terminal holds, and the latest virtual placement of each.
+     Copies share each image; an image is replaced, never changed, so a new
+     pointer means new pixels. */
   class Images {
+  public:
+    typedef std::vector< shared::shared_ptr<const Image> > list_type;
+
   private:
-    std::vector< shared::shared_ptr<const Image> > images; /* oldest first */
+    list_type images; /* oldest first */
+    std::map<uint32_t, ImagePlacement> placements; /* by image id */
     size_t max_bytes;
 
   public:
     /* The most all images together may take once decoded from base64. */
     static const size_t MAX_BYTES = 16 * 1024 * 1024;
 
-    Images( size_t s_max_bytes = MAX_BYTES ) : images(), max_bytes( s_max_bytes ) {}
+    Images( size_t s_max_bytes = MAX_BYTES ) : images(), placements(), max_bytes( s_max_bytes ) {}
 
     const Image *get( uint32_t id ) const;
     size_t size( void ) const { return images.size(); }
+    const list_type & list( void ) const { return images; }
+    std::optional<ImagePlacement> placement( uint32_t id ) const;
     /* Stores an image, replacing one with the same id, and evicts the oldest
        images while all of them take more than the limit. */
     void put( const Image &image );
     void remove( uint32_t id );
-    void unplace_all( void );
-    void clear( void ) { images.clear(); }
-    /* Sets or, with an empty placement, drops the placement of an image. */
+    void unplace_all( void ) { placements.clear(); }
+    void clear( void ) { images.clear(); placements.clear(); }
+    /* Sets or, with an empty placement, drops the placement of a stored image. */
     void place( uint32_t id, const std::optional<ImagePlacement> &placement );
 
-    bool operator==( const Images &x ) const { return images == x.images; }
+    bool operator==( const Images &x ) const { return images == x.images && placements == x.placements; }
   };
 
   /* Applies graphics commands, the bodies of APC strings starting with G, to
@@ -91,6 +105,7 @@ namespace Terminal {
   class GraphicsReceiver {
   private:
     std::optional<Image> upload;
+    std::optional<ImagePlacement> upload_placement; /* a=T with U=1 places the image once stored */
     bool refused; /* the transmission in progress is dropped until its last chunk */
 
   public:
@@ -103,7 +118,7 @@ namespace Terminal {
     /* The longest command worth reading: a whole image plus room for its keys. */
     static const size_t MAX_COMMAND_BYTES = MAX_IMAGE_BASE64 + 4096;
 
-    GraphicsReceiver() : upload(), refused( false ) {}
+    GraphicsReceiver() : upload(), upload_placement(), refused( false ) {}
 
     void apply( const std::string &body, Images &images );
   };

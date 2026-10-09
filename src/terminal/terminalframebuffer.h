@@ -460,6 +460,8 @@ namespace Terminal {
     const title_type & get_clipboard( void ) const { return clipboard; }
     const Image *get_image( uint32_t id ) const { return images.get( id ); }
     size_t image_count( void ) const { return images.size(); }
+    const Images & get_images( void ) const { return images; }
+    std::optional<ImagePlacement> get_placement( uint32_t id ) const { return images.placement( id ); }
     Images & get_mutable_images( void ) { return images; }
 
     void prefix_window_title( const title_type &s );

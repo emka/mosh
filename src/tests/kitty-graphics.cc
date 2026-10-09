@@ -248,10 +248,11 @@ static void keeps_an_assigned_copy_independent_of_the_original( void )
   fatal_assert( image && image->base64 == "AAAA" );
 }
 
-static bool has_placement( const Terminal::Image *image, uint32_t placement_id, int cols, int rows )
+static bool has_placement( const Terminal::Framebuffer &fb, uint32_t id, uint32_t placement_id, int cols, int rows )
 {
-  return image && image->placement && image->placement->placement_id == placement_id
-    && image->placement->cols == cols && image->placement->rows == rows;
+  const std::optional<Terminal::ImagePlacement> placement = fb.get_placement( id );
+  return placement && placement->placement_id == placement_id
+    && placement->cols == cols && placement->rows == rows;
 }
 
 static void stores_the_virtual_placement_sent_with_an_image( void )
@@ -263,7 +264,7 @@ static void stores_the_virtual_placement_sent_with_an_image( void )
   term.act( "\033_Ga=T,U=1,i=1,c=4,r=2,f=100;AAAA\033\\" );
 
   // Then
-  fatal_assert( has_placement( term.get_fb().get_image( 1 ), 0, 4, 2 ) );
+  fatal_assert( has_placement( term.get_fb(), 1, 0, 4, 2 ) );
 }
 
 static void places_a_stored_image( void )
@@ -277,7 +278,7 @@ static void places_a_stored_image( void )
 
   // Then
   const Terminal::Image *image = term.get_fb().get_image( 1 );
-  fatal_assert( has_placement( image, 3, 10, 5 ) && image->base64 == "AAAA" );
+  fatal_assert( has_placement( term.get_fb(), 1, 3, 10, 5 ) && image && image->base64 == "AAAA" );
 }
 
 static void keeps_only_the_latest_placement_of_an_image( void )
@@ -290,7 +291,7 @@ static void keeps_only_the_latest_placement_of_an_image( void )
   term.act( "\033_Ga=p,U=1,i=1,p=2,c=6,r=3\033\\" );
 
   // Then
-  fatal_assert( has_placement( term.get_fb().get_image( 1 ), 2, 6, 3 ) );
+  fatal_assert( has_placement( term.get_fb(), 1, 2, 6, 3 ) );
 }
 
 static void ignores_a_placement_of_an_unknown_image( void )
@@ -315,7 +316,7 @@ static void keeps_no_direct_placement( void )
 
   // Then
   const Terminal::Image *image = term.get_fb().get_image( 1 );
-  fatal_assert( image && !image->placement );
+  fatal_assert( image && !term.get_fb().get_placement( 1 ) );
 }
 
 static void deletes_the_placement_of_one_image( void )
@@ -329,7 +330,7 @@ static void deletes_the_placement_of_one_image( void )
 
   // Then
   const Terminal::Image *image = term.get_fb().get_image( 1 );
-  fatal_assert( image && !image->placement && image->base64 == "AAAA" );
+  fatal_assert( image && !term.get_fb().get_placement( 1 ) && image->base64 == "AAAA" );
 }
 
 static void deletes_one_image( void )
@@ -357,7 +358,7 @@ static void deletes_every_placement( void )
   // Then
   const Terminal::Image *first = term.get_fb().get_image( 1 );
   const Terminal::Image *second = term.get_fb().get_image( 2 );
-  fatal_assert( first && !first->placement && second && !second->placement );
+  fatal_assert( first && !term.get_fb().get_placement( 1 ) && second && !term.get_fb().get_placement( 2 ) );
 }
 
 static void deletes_every_image( void )
@@ -384,7 +385,7 @@ static void deletes_every_placement_when_no_scope_is_given( void )
 
   // Then
   const Terminal::Image *image = term.get_fb().get_image( 1 );
-  fatal_assert( image && !image->placement );
+  fatal_assert( image && !term.get_fb().get_placement( 1 ) );
 }
 
 static void refuses_an_image_over_one_mebibyte( void )

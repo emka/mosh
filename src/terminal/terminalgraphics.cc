@@ -76,20 +76,27 @@ const Image *Images::get( uint32_t id ) const
   return nullptr;
 }
 
+std::optional<ImagePlacement> Images::placement( uint32_t id ) const
+{
+  auto found = placements.find( id );
+  if ( found == placements.end() ) {
+    return std::nullopt;
+  }
+  return found->second;
+}
+
 void Images::place( uint32_t id, const std::optional<ImagePlacement> &placement )
 {
-  for ( auto &image : images ) {
-    if ( image->id == id ) {
-      Image placed( *image );
-      placed.placement = placement;
-      image = shared::make_shared<const Image>( placed );
-      return;
-    }
+  if ( !placement ) {
+    placements.erase( id );
+  } else if ( get( id ) ) {
+    placements[ id ] = *placement;
   }
 }
 
 void Images::remove( uint32_t id )
 {
+  placements.erase( id );
   for ( auto i = images.begin(); i != images.end(); i++ ) {
     if ( (*i)->id == id ) {
       images.erase( i );
@@ -98,20 +105,14 @@ void Images::remove( uint32_t id )
   }
 }
 
-void Images::unplace_all( void )
-{
-  for ( auto &image : images ) {
-    if ( image->placement ) {
-      Image unplaced( *image );
-      unplaced.placement.reset();
-      image = shared::make_shared<const Image>( unplaced );
-    }
-  }
-}
-
 void Images::put( const Image &image )
 {
-  remove( image.id );
+  for ( auto i = images.begin(); i != images.end(); i++ ) {
+    if ( (*i)->id == image.id ) {
+      images.erase( i );
+      break;
+    }
+  }
   images.push_back( shared::make_shared<const Image>( image ) );
 
   size_t bytes = 0;
@@ -120,7 +121,7 @@ void Images::put( const Image &image )
   }
   while ( bytes > max_bytes ) {
     bytes -= decoded_size( images.front()->base64 );
-    images.erase( images.begin() );
+    remove( images.front()->id );
   }
 }
 
@@ -182,9 +183,6 @@ static Image image_from( Keys &keys, const std::string &payload )
   image.height = atoi( keys[ "v" ].c_str() );
   image.zlib = keys[ "o" ] == "z";
   image.base64 = payload;
-  if ( keys[ "a" ] == "T" && keys[ "U" ] == "1" ) {
-    image.placement = placement_from( keys );
-  }
   return image;
 }
 
@@ -227,18 +225,26 @@ void GraphicsReceiver::apply( const std::string &body, Images &images )
     refused = true;
   } else {
     upload = image_from( keys, payload );
+    if ( keys[ "a" ] == "T" && keys[ "U" ] == "1" ) {
+      upload_placement = placement_from( keys );
+    }
   }
 
   if ( upload && upload->base64.size() > MAX_IMAGE_BASE64 ) {
     upload.reset();
+    upload_placement.reset();
     refused = true;
   }
 
   if ( keys[ "m" ] != "1" ) {
     if ( upload && is_base64( upload->base64 ) && decoded_size( upload->base64 ) <= MAX_IMAGE_BYTES ) {
       images.put( *upload );
+      if ( upload_placement ) {
+        images.place( upload->id, upload_placement );
+      }
     }
     upload.reset();
+    upload_placement.reset();
     refused = false;
   }
 }
