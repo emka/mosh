@@ -70,6 +70,11 @@ namespace Terminal {
     const Image *get( uint32_t id ) const;
     size_t size( void ) const { return images.size(); }
     void put( const Image &image );
+    void remove( uint32_t id );
+    void unplace_all( void );
+    void clear( void ) { images.clear(); }
+    /* Sets or, with an empty placement, drops the placement of an image. */
+    void place( uint32_t id, const std::optional<ImagePlacement> &placement );
 
     bool operator==( const Images &x ) const { return images == x.images; }
   };

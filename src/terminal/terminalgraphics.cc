@@ -48,14 +48,42 @@ const Image *Images::get( uint32_t id ) const
   return nullptr;
 }
 
-void Images::put( const Image &image )
+void Images::place( uint32_t id, const std::optional<ImagePlacement> &placement )
 {
-  for ( auto i = images.begin(); i != images.end(); i++ ) {
-    if ( (*i)->id == image.id ) {
-      images.erase( i );
-      break;
+  for ( auto &image : images ) {
+    if ( image->id == id ) {
+      Image placed( *image );
+      placed.placement = placement;
+      image = shared::make_shared<const Image>( placed );
+      return;
     }
   }
+}
+
+void Images::remove( uint32_t id )
+{
+  for ( auto i = images.begin(); i != images.end(); i++ ) {
+    if ( (*i)->id == id ) {
+      images.erase( i );
+      return;
+    }
+  }
+}
+
+void Images::unplace_all( void )
+{
+  for ( auto &image : images ) {
+    if ( image->placement ) {
+      Image unplaced( *image );
+      unplaced.placement.reset();
+      image = shared::make_shared<const Image>( unplaced );
+    }
+  }
+}
+
+void Images::put( const Image &image )
+{
+  remove( image.id );
   images.push_back( shared::make_shared<const Image>( image ) );
 }
 
@@ -80,6 +108,49 @@ static Keys parse_keys( const std::string &control )
   return keys;
 }
 
+static ImagePlacement placement_from( Keys &keys )
+{
+  ImagePlacement placement;
+  placement.placement_id = strtoul( keys[ "p" ].c_str(), nullptr, 10 );
+  placement.cols = atoi( keys[ "c" ].c_str() );
+  placement.rows = atoi( keys[ "r" ].c_str() );
+  return placement;
+}
+
+static uint32_t image_id( Keys &keys )
+{
+  return strtoul( keys[ "i" ].c_str(), nullptr, 10 );
+}
+
+static void delete_images( Keys &keys, Images &images )
+{
+  const std::string scope = keys[ "d" ].empty() ? "a" : keys[ "d" ];
+  if ( scope == "a" ) {
+    images.unplace_all();
+  } else if ( scope == "A" ) {
+    images.clear();
+  } else if ( scope == "i" ) {
+    images.place( image_id( keys ), std::nullopt );
+  } else if ( scope == "I" ) {
+    images.remove( image_id( keys ) );
+  }
+}
+
+static Image image_from( Keys &keys, const std::string &payload )
+{
+  Image image;
+  image.id = image_id( keys );
+  image.format = atoi( keys[ "f" ].c_str() );
+  image.width = atoi( keys[ "s" ].c_str() );
+  image.height = atoi( keys[ "v" ].c_str() );
+  image.zlib = keys[ "o" ] == "z";
+  image.base64 = payload;
+  if ( keys[ "a" ] == "T" && keys[ "U" ] == "1" ) {
+    image.placement = placement_from( keys );
+  }
+  return image;
+}
+
 void GraphicsReceiver::apply( const std::string &body, Images &images )
 {
   if ( body.empty() || body[ 0 ] != 'G' ) {
@@ -91,15 +162,16 @@ void GraphicsReceiver::apply( const std::string &body, Images &images )
 
   if ( upload ) {
     upload->base64 += payload;
+  } else if ( keys[ "a" ] == "p" ) {
+    if ( keys[ "U" ] == "1" ) {
+      images.place( image_id( keys ), placement_from( keys ) );
+    }
+    return;
+  } else if ( keys[ "a" ] == "d" ) {
+    delete_images( keys, images );
+    return;
   } else {
-    Image image;
-    image.id = strtoul( keys[ "i" ].c_str(), nullptr, 10 );
-    image.format = atoi( keys[ "f" ].c_str() );
-    image.width = atoi( keys[ "s" ].c_str() );
-    image.height = atoi( keys[ "v" ].c_str() );
-    image.zlib = keys[ "o" ] == "z";
-    image.base64 = payload;
-    upload = image;
+    upload = image_from( keys, payload );
   }
 
   if ( keys[ "m" ] != "1" ) {

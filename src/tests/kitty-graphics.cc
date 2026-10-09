@@ -213,6 +213,145 @@ static void keeps_an_assigned_copy_independent_of_the_original( void )
   fatal_assert( image && image->base64 == "AAAA" );
 }
 
+static bool has_placement( const Terminal::Image *image, uint32_t placement_id, int cols, int rows )
+{
+  return image && image->placement && image->placement->placement_id == placement_id
+    && image->placement->cols == cols && image->placement->rows == rows;
+}
+
+static void stores_the_virtual_placement_sent_with_an_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=T,U=1,i=1,c=4,r=2,f=100;AAAA\033\\" );
+
+  // Then
+  fatal_assert( has_placement( term.get_fb().get_image( 1 ), 0, 4, 2 ) );
+}
+
+static void places_a_stored_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;AAAA\033\\" );
+
+  // When
+  term.act( "\033_Ga=p,U=1,i=1,p=3,c=10,r=5\033\\" );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 1 );
+  fatal_assert( has_placement( image, 3, 10, 5 ) && image->base64 == "AAAA" );
+}
+
+static void keeps_only_the_latest_placement_of_an_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=T,U=1,i=1,c=4,r=2,f=100;AAAA\033\\" );
+
+  // When
+  term.act( "\033_Ga=p,U=1,i=1,p=2,c=6,r=3\033\\" );
+
+  // Then
+  fatal_assert( has_placement( term.get_fb().get_image( 1 ), 2, 6, 3 ) );
+}
+
+static void ignores_a_placement_of_an_unknown_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=p,U=1,i=1,c=4,r=2\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void keeps_no_direct_placement( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+
+  // When
+  term.act( "\033_Ga=T,i=1,c=4,r=2,f=100;AAAA\033\\" );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 1 );
+  fatal_assert( image && !image->placement );
+}
+
+static void deletes_the_placement_of_one_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=T,U=1,i=1,c=4,r=2,f=100;AAAA\033\\" );
+
+  // When
+  term.act( "\033_Ga=d,d=i,i=1\033\\" );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 1 );
+  fatal_assert( image && !image->placement && image->base64 == "AAAA" );
+}
+
+static void deletes_one_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;AAAA\033\\\033_Ga=t,i=2,f=100;BBBB\033\\" );
+
+  // When
+  term.act( "\033_Ga=d,d=I,i=1\033\\" );
+
+  // Then
+  fatal_assert( !term.get_fb().get_image( 1 ) && term.get_fb().get_image( 2 ) );
+}
+
+static void deletes_every_placement( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=T,U=1,i=1,c=1,r=1,f=100;AAAA\033\\\033_Ga=T,U=1,i=2,c=1,r=1,f=100;BBBB\033\\" );
+
+  // When
+  term.act( "\033_Ga=d,d=a\033\\" );
+
+  // Then
+  const Terminal::Image *first = term.get_fb().get_image( 1 );
+  const Terminal::Image *second = term.get_fb().get_image( 2 );
+  fatal_assert( first && !first->placement && second && !second->placement );
+}
+
+static void deletes_every_image( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=T,U=1,i=1,c=1,r=1,f=100;AAAA\033\\\033_Ga=t,i=2,f=100;BBBB\033\\" );
+
+  // When
+  term.act( "\033_Ga=d,d=A\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
+static void deletes_every_placement_when_no_scope_is_given( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=T,U=1,i=1,c=1,r=1,f=100;AAAA\033\\" );
+
+  // When
+  term.act( "\033_Ga=d\033\\" );
+
+  // Then
+  const Terminal::Image *image = term.get_fb().get_image( 1 );
+  fatal_assert( image && !image->placement );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -231,5 +370,15 @@ int main( void )
   ignores_application_commands_other_than_graphics();
   tells_a_terminal_apart_from_its_copy_once_it_gets_an_image();
   keeps_an_assigned_copy_independent_of_the_original();
+  stores_the_virtual_placement_sent_with_an_image();
+  places_a_stored_image();
+  keeps_only_the_latest_placement_of_an_image();
+  ignores_a_placement_of_an_unknown_image();
+  keeps_no_direct_placement();
+  deletes_the_placement_of_one_image();
+  deletes_one_image();
+  deletes_every_placement();
+  deletes_every_image();
+  deletes_every_placement_when_no_scope_is_given();
   return 0;
 }
