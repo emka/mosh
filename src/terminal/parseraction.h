@@ -126,6 +126,21 @@ namespace Parser {
     std::string name( void ) { return std::string( "OSC_End" ); }
     void act_on_terminal( Terminal::Emulator *emu ) const;
   };
+  class APC_Start : public Action {
+  public:
+    std::string name( void ) { return std::string( "APC_Start" ); }
+    void act_on_terminal( Terminal::Emulator *emu ) const;
+  };
+  class APC_Put : public Action {
+  public:
+    std::string name( void ) { return std::string( "APC_Put" ); }
+    void act_on_terminal( Terminal::Emulator *emu ) const;
+  };
+  class APC_End : public Action {
+  public:
+    std::string name( void ) { return std::string( "APC_End" ); }
+    void act_on_terminal( Terminal::Emulator *emu ) const;
+  };
 
   class UserByte : public Action {
     /* user keystroke -- not part of the host-source state machine*/

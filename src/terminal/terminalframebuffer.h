@@ -43,6 +43,7 @@
 #include <list>
 
 #include "shared.h"
+#include "terminalgraphics.h"
 
 /* Terminal framebuffer */
 
@@ -380,6 +381,7 @@ namespace Terminal {
     title_type icon_name;
     title_type window_title;
     title_type clipboard;
+    Images images;
     unsigned int bell_count;
     bool title_initialized; /* true if the window title has been set via an OSC */
 
@@ -456,6 +458,9 @@ namespace Terminal {
     const title_type & get_icon_name( void ) const { return icon_name; }
     const title_type & get_window_title( void ) const { return window_title; }
     const title_type & get_clipboard( void ) const { return clipboard; }
+    const Image *get_image( uint32_t id ) const { return images.get( id ); }
+    size_t image_count( void ) const { return images.size(); }
+    Images & get_mutable_images( void ) { return images; }
 
     void prefix_window_title( const title_type &s );
 
@@ -469,7 +474,7 @@ namespace Terminal {
 
     bool operator==( const Framebuffer &x ) const
     {
-      return ( rows == x.rows ) && ( window_title == x.window_title ) && ( clipboard  == x.clipboard ) && ( bell_count == x.bell_count ) && ( ds == x.ds );
+      return ( rows == x.rows ) && ( window_title == x.window_title ) && ( clipboard  == x.clipboard ) && ( images == x.images ) && ( bell_count == x.bell_count ) && ( ds == x.ds );
     }
   };
 }

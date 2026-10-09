@@ -56,6 +56,9 @@ namespace Terminal {
     friend void Parser::OSC_Start::act_on_terminal( Emulator * ) const;
     friend void Parser::OSC_Put::act_on_terminal( Emulator * ) const;
     friend void Parser::OSC_End::act_on_terminal( Emulator * ) const;
+    friend void Parser::APC_Start::act_on_terminal( Emulator * ) const;
+    friend void Parser::APC_Put::act_on_terminal( Emulator * ) const;
+    friend void Parser::APC_End::act_on_terminal( Emulator * ) const;
 
     friend void Parser::UserByte::act_on_terminal( Emulator * ) const;
     friend void Parser::Resize::act_on_terminal( Emulator * ) const;
@@ -63,6 +66,7 @@ namespace Terminal {
   private:
     Framebuffer fb;
     Dispatcher dispatch;
+    GraphicsReceiver graphics;
     UserInput user;
 
     /* action methods */
@@ -71,6 +75,7 @@ namespace Terminal {
     void CSI_dispatch( const Parser::CSI_Dispatch *act );
     void Esc_dispatch( const Parser::Esc_Dispatch *act );
     void OSC_end( const Parser::OSC_End *act );
+    void APC_end( const Parser::APC_End *act );
     void resize( size_t s_width, size_t s_height );
 
   public:

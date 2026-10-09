@@ -41,7 +41,7 @@
 using namespace Terminal;
 
 Emulator::Emulator( size_t s_width, size_t s_height )
-  : fb( s_width, s_height ), dispatch(), user()
+  : fb( s_width, s_height ), dispatch(), graphics(), user()
 {}
 
 std::string Emulator::read_octets_to_host( void )
@@ -155,6 +155,11 @@ void Emulator::CSI_dispatch( const Parser::CSI_Dispatch *act )
 void Emulator::OSC_end( const Parser::OSC_End *act )
 {
   dispatch.OSC_dispatch( act, &fb );
+}
+
+void Emulator::APC_end( const Parser::APC_End *act __attribute((unused)) )
+{
+  graphics.apply( dispatch.get_APC_string(), fb.get_mutable_images() );
 }
 
 void Emulator::Esc_dispatch( const Parser::Esc_Dispatch *act )

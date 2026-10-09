@@ -48,6 +48,8 @@ namespace Parser {
   class OSC_Start;
   class OSC_Put;
   class OSC_End;
+  class APC_Start;
+  class APC_Put;
 }
 
 namespace Terminal {
@@ -87,6 +89,7 @@ namespace Terminal {
 
     std::string dispatch_chars;
     std::vector<wchar_t> OSC_string; /* only used to set the window title */
+    std::string APC_string; /* the body of the application program command being received */
 
     void parse_params( void );
 
@@ -113,6 +116,10 @@ namespace Terminal {
     void OSC_put( const Parser::OSC_Put *act );
     void OSC_start( const Parser::OSC_Start *act );
     void OSC_dispatch( const Parser::OSC_End *act, Framebuffer *fb );
+
+    void APC_start( const Parser::APC_Start *act );
+    void APC_put( const Parser::APC_Put *act );
+    const std::string & get_APC_string( void ) const { return APC_string; }
 
     bool operator==( const Dispatcher &x ) const;
   };

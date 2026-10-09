@@ -46,7 +46,7 @@ static const size_t MAXIMUM_CLIPBOARD_SIZE = 16*1024;
 
 Dispatcher::Dispatcher()
   : params(), parsed_params(), parsed( false ), dispatch_chars(),
-    OSC_string(), terminal_to_host()
+    OSC_string(), APC_string(), terminal_to_host()
 {}
 
 void Dispatcher::newparamchar( const Parser::Param *act )
@@ -244,6 +244,17 @@ void Dispatcher::OSC_put( const Parser::OSC_Put *act )
 void Dispatcher::OSC_start( const Parser::OSC_Start *act __attribute((unused)) )
 {
   OSC_string.clear();
+}
+
+void Dispatcher::APC_start( const Parser::APC_Start *act __attribute((unused)) )
+{
+  APC_string.clear();
+}
+
+void Dispatcher::APC_put( const Parser::APC_Put *act )
+{
+  assert( act->char_present );
+  APC_string.push_back( static_cast<char>( act->ch ) );
 }
 
 bool Dispatcher::operator==( const Dispatcher &x ) const

@@ -47,8 +47,10 @@ Transition State::anywhere_rule( wchar_t ch ) const
     return Transition( &family->s_Ground );
   } else if ( ch == 0x1B ) {
     return Transition( &family->s_Escape );
-  } else if ( (ch == 0x98) || (ch == 0x9E) || (ch == 0x9F) ) {
-    return Transition( &family->s_SOS_PM_APC_String );
+  } else if ( (ch == 0x98) || (ch == 0x9E) ) {
+    return Transition( &family->s_SOS_PM_String );
+  } else if ( ch == 0x9F ) {
+    return Transition( &family->s_APC_String );
   } else if ( ch == 0x90 ) {
     return Transition( &family->s_DCS_Entry );
   } else if ( ch == 0x9D ) {
@@ -139,8 +141,12 @@ Transition Escape::input_state_rule( wchar_t ch ) const
     return Transition( &family->s_DCS_Entry );
   }
 
-  if ( (ch == 0x58) || (ch == 0x5E) || (ch == 0x5F) ) {
-    return Transition( &family->s_SOS_PM_APC_String );
+  if ( (ch == 0x58) || (ch == 0x5E) ) {
+    return Transition( &family->s_SOS_PM_String );
+  }
+
+  if ( ch == 0x5F ) {
+    return Transition( &family->s_APC_String );
   }
 
   return Transition();
@@ -380,8 +386,31 @@ Transition OSC_String::input_state_rule( wchar_t ch ) const
   return Transition();
 }
 
-Transition SOS_PM_APC_String::input_state_rule( wchar_t ch ) const
+Transition SOS_PM_String::input_state_rule( wchar_t ch ) const
 {
+  if ( ch == 0x9C ) {
+    return Transition( &family->s_Ground );
+  }
+
+  return Transition();
+}
+
+ActionPointer APC_String::enter( void ) const
+{
+  return shared::make_shared< APC_Start >();
+}
+
+ActionPointer APC_String::exit( void ) const
+{
+  return shared::make_shared< APC_End >();
+}
+
+Transition APC_String::input_state_rule( wchar_t ch ) const
+{
+  if ( (0x20 <= ch) && (ch <= 0x7F) ) {
+    return Transition( shared::make_shared< APC_Put >() );
+  }
+
   if ( ch == 0x9C ) {
     return Transition( &family->s_Ground );
   }
