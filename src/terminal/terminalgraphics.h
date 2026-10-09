@@ -99,14 +99,22 @@ namespace Terminal {
     bool operator==( const Images &x ) const { return images == x.images && placements == x.placements; }
   };
 
+  /* An image being received, possibly in chunks. */
+  struct Transmission {
+    uint32_t id;
+    bool query;                              /* a=q: checked and answered, never stored */
+    int quiet;                               /* q: 1 suppresses OK, 2 every reply */
+    std::optional<Image> image;              /* empty once the transmission is refused */
+    std::optional<ImagePlacement> placement; /* a=T with U=1 places the image once stored */
+    std::string error;                       /* why it was refused, as kitty reports it */
+  };
+
   /* Applies graphics commands, the bodies of APC strings starting with G, to
      the images a terminal holds. Keeps a transmission sent in chunks until
      its last chunk arrives. */
   class GraphicsReceiver {
   private:
-    std::optional<Image> upload;
-    std::optional<ImagePlacement> upload_placement; /* a=T with U=1 places the image once stored */
-    bool refused; /* the transmission in progress is dropped until its last chunk */
+    std::optional<Transmission> transmission;
 
   public:
     /* The most an image may take once decoded from base64. */
@@ -118,9 +126,10 @@ namespace Terminal {
     /* The longest command worth reading: a whole image plus room for its keys. */
     static const size_t MAX_COMMAND_BYTES = MAX_IMAGE_BASE64 + 4096;
 
-    GraphicsReceiver() : upload(), upload_placement(), refused( false ) {}
+    GraphicsReceiver() : transmission() {}
 
-    void apply( const std::string &body, Images &images );
+    /* Returns the reply for the program, empty when there is none. */
+    std::string apply( const std::string &body, Images &images );
   };
 }
 

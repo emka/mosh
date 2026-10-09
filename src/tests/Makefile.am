@@ -38,8 +38,8 @@ displaytests = \
 	unicode-later-combining.test \
 	window-resize.test
 
-check_PROGRAMS = ocb-aes encrypt-decrypt base64 nonce-incr inpty is-utf8-locale kitty-graphics kitty-display
-TESTS = ocb-aes encrypt-decrypt base64 nonce-incr kitty-graphics kitty-display local.test $(displaytests)
+check_PROGRAMS = ocb-aes encrypt-decrypt base64 nonce-incr inpty is-utf8-locale kitty-graphics kitty-display kitty-replies
+TESTS = ocb-aes encrypt-decrypt base64 nonce-incr kitty-graphics kitty-display kitty-replies local.test $(displaytests)
 XFAIL_TESTS = \
 	e2e-failure.test \
 	emulation-attributes-256color8.test
@@ -71,6 +71,10 @@ kitty_graphics_LDADD = ../statesync/libmoshstatesync.a ../terminal/libmoshtermin
 kitty_display_SOURCES = kitty-display.cc
 kitty_display_CPPFLAGS = $(kitty_graphics_CPPFLAGS)
 kitty_display_LDADD = $(kitty_graphics_LDADD)
+
+kitty_replies_SOURCES = kitty-replies.cc
+kitty_replies_CPPFLAGS = $(kitty_graphics_CPPFLAGS)
+kitty_replies_LDADD = $(kitty_graphics_LDADD)
 
 inpty_SOURCES = inpty.cc
 inpty_CPPFLAGS = -I$(srcdir)/../util

@@ -174,7 +174,8 @@ static void delete_images( Keys &keys, Images &images )
   }
 }
 
-static Image image_from( Keys &keys, const std::string &payload )
+/* The image a transmission describes, before its payload arrives. */
+static Image image_from( Keys &keys )
 {
   Image image;
   image.id = image_id( keys );
@@ -182,69 +183,114 @@ static Image image_from( Keys &keys, const std::string &payload )
   image.width = atoi( keys[ "s" ].c_str() );
   image.height = atoi( keys[ "v" ].c_str() );
   image.zlib = keys[ "o" ] == "z";
-  image.base64 = payload;
   return image;
 }
 
-/* Whether a transmission is one this terminal keeps: identified by i, sent
-   directly in the command rather than as a file, and either PNG or raw
-   pixels of a given size. */
-static bool is_supported( Keys &keys )
+/* Why a transmission is not one this terminal keeps, as kitty reports it,
+   or empty when it is: identified by i, sent directly in the command rather
+   than as a file, and either PNG or raw pixels of a given size. */
+static std::string unsupported( Keys &keys )
 {
-  const Image image = image_from( keys, "" );
-  const bool sized = image.width > 0 && image.height > 0;
-  return image.id != 0 && !keys.count( "I" )
-    && ( keys[ "t" ].empty() || keys[ "t" ] == "d" )
-    && ( image.format == 100 || ( ( image.format == 24 || image.format == 32 ) && sized ) );
+  const Image image = image_from( keys );
+  if ( keys.count( "I" ) ) {
+    return "ENOTSUPPORTED:image numbers are not supported";
+  }
+  if ( image.id == 0 ) {
+    return "EINVAL:no image id";
+  }
+  if ( !keys[ "t" ].empty() && keys[ "t" ] != "d" ) {
+    return "ENOTSUPPORTED:only direct transmission is supported";
+  }
+  if ( image.format != 100 && image.format != 24 && image.format != 32 ) {
+    return "EINVAL:unknown format";
+  }
+  if ( image.format != 100 && ( image.width <= 0 || image.height <= 0 ) ) {
+    return "EINVAL:raw pixels need s and v";
+  }
+  return "";
 }
 
-void GraphicsReceiver::apply( const std::string &body, Images &images )
+/* A reply in the form kitty sends: OK, or an error code and message. */
+static std::string reply( uint32_t id, const std::string &message )
+{
+  return "\033_Gi=" + std::to_string( id ) + ";" + message + "\033\\";
+}
+
+/* The reply to a finished transmission, unless q asks for none. Without an
+   id there is nothing to reply to. */
+static std::string answer( const Transmission &done )
+{
+  if ( done.id == 0 || done.quiet >= 2 || ( done.error.empty() && done.quiet >= 1 ) ) {
+    return "";
+  }
+  return reply( done.id, done.error.empty() ? "OK" : done.error );
+}
+
+static const char *const TOO_BIG = "EFBIG:images are limited to 1 MiB";
+
+std::string GraphicsReceiver::apply( const std::string &body, Images &images )
 {
   if ( body.empty() || body[ 0 ] != 'G' ) {
-    return;
+    return "";
   }
   size_t semicolon = body.find( ';' );
   Keys keys = parse_keys( body.substr( 1, semicolon == std::string::npos ? std::string::npos : semicolon - 1 ) );
   std::string payload = semicolon == std::string::npos ? std::string() : body.substr( semicolon + 1 );
 
-  if ( upload || refused ) {
-    if ( upload ) {
-      upload->base64 += payload;
+  if ( !transmission ) {
+    const std::string action = keys[ "a" ].empty() ? "t" : keys[ "a" ];
+    if ( action == "p" ) {
+      if ( keys[ "U" ] == "1" ) {
+        images.place( image_id( keys ), placement_from( keys ) );
+      }
+      return "";
     }
-  } else if ( keys[ "a" ] == "p" ) {
-    if ( keys[ "U" ] == "1" ) {
-      images.place( image_id( keys ), placement_from( keys ) );
+    if ( action == "d" ) {
+      delete_images( keys, images );
+      return "";
     }
-    return;
-  } else if ( keys[ "a" ] == "d" ) {
-    delete_images( keys, images );
-    return;
-  } else if ( !keys[ "a" ].empty() && keys[ "a" ] != "t" && keys[ "a" ] != "T" ) {
-    return;
-  } else if ( !is_supported( keys ) ) {
-    refused = true;
-  } else {
-    upload = image_from( keys, payload );
-    if ( keys[ "a" ] == "T" && keys[ "U" ] == "1" ) {
-      upload_placement = placement_from( keys );
+    if ( action != "t" && action != "T" && action != "q" ) {
+      return "";
     }
-  }
-
-  if ( upload && upload->base64.size() > MAX_IMAGE_BASE64 ) {
-    upload.reset();
-    upload_placement.reset();
-    refused = true;
-  }
-
-  if ( keys[ "m" ] != "1" ) {
-    if ( upload && is_base64( upload->base64 ) && decoded_size( upload->base64 ) <= MAX_IMAGE_BYTES ) {
-      images.put( *upload );
-      if ( upload_placement ) {
-        images.place( upload->id, upload_placement );
+    Transmission started;
+    started.id = image_id( keys );
+    started.query = action == "q";
+    started.quiet = atoi( keys[ "q" ].c_str() );
+    started.error = unsupported( keys );
+    if ( started.error.empty() ) {
+      started.image = image_from( keys );
+      if ( action == "T" && keys[ "U" ] == "1" ) {
+        started.placement = placement_from( keys );
       }
     }
-    upload.reset();
-    upload_placement.reset();
-    refused = false;
+    transmission = started;
   }
+
+  if ( transmission->image ) {
+    transmission->image->base64 += payload;
+    if ( transmission->image->base64.size() > MAX_IMAGE_BASE64 ) {
+      transmission->image.reset();
+      transmission->error = TOO_BIG;
+    }
+  }
+
+  if ( keys[ "m" ] == "1" ) {
+    return "";
+  }
+  Transmission done = *transmission;
+  transmission.reset();
+  if ( done.image && !is_base64( done.image->base64 ) ) {
+    done.image.reset();
+    done.error = "EINVAL:the payload is not base64";
+  } else if ( done.image && decoded_size( done.image->base64 ) > MAX_IMAGE_BYTES ) {
+    done.image.reset();
+    done.error = TOO_BIG;
+  }
+  if ( done.image && !done.query ) {
+    images.put( *done.image );
+    if ( done.placement ) {
+      images.place( done.id, done.placement );
+    }
+  }
+  return answer( done );
 }
