@@ -124,6 +124,8 @@ namespace Terminal {
     void APC_start( const Parser::APC_Start *act );
     void APC_put( const Parser::APC_Put *act );
     void APC_dispatch( Framebuffer *fb );
+    /* Forgets a graphics transmission the program never finished. */
+    void reset_graphics( void ) { graphics = GraphicsReceiver(); }
 
     bool operator==( const Dispatcher &x ) const;
   };

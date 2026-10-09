@@ -573,9 +573,10 @@ static void CSI_ECH( Framebuffer *fb, Dispatcher *dispatch )
 static Function func_CSI_ECH( CSI, "X", CSI_ECH );
 
 /* reset to initial state */
-static void Esc_RIS( Framebuffer *fb, Dispatcher *dispatch __attribute((unused)) )
+static void Esc_RIS( Framebuffer *fb, Dispatcher *dispatch )
 {
   fb->reset();
+  dispatch->reset_graphics();
 }
 
 static Function func_Esc_RIS( ESCAPE, "c", Esc_RIS );

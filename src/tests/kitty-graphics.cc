@@ -596,6 +596,19 @@ static void deletes_after_an_abandoned_transmission( void )
   fatal_assert( term.get_fb().image_count() == 0 );
 }
 
+static void forgets_an_unfinished_transmission_on_a_full_reset( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=5,f=100,m=1;AAAA\033\\" );
+
+  // When
+  term.act( "\033c\033_Gm=0;AAAA\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -639,5 +652,6 @@ int main( void )
   drops_every_image_on_a_full_reset();
   ignores_actions_other_than_transmit_place_and_delete();
   deletes_after_an_abandoned_transmission();
+  forgets_an_unfinished_transmission_on_a_full_reset();
   return 0;
 }
