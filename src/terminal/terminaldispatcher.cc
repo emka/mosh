@@ -53,7 +53,7 @@ Dispatcher::Dispatcher()
 void Dispatcher::newparamchar( const Parser::Param *act )
 {
   assert( act->char_present );
-  assert( (act->ch == ';') || ( (act->ch >= '0') && (act->ch <= '9') ) );
+  assert( (act->ch == ';') || (act->ch == ':') || ( (act->ch >= '0') && (act->ch <= '9') ) );
   if ( params.length() < 100 ) {
     /* enough for 16 five-char params plus 15 semicolons */
     params.push_back( act->ch );
@@ -77,6 +77,43 @@ void Dispatcher::clear( const Parser::Clear *act __attribute((unused)) )
   parsed = false;
 }
 
+static std::vector<std::string> split( const std::string &text, char separator )
+{
+  std::vector<std::string> parts;
+  size_t start = 0;
+  while ( true ) {
+    const size_t end = text.find( separator, start );
+    parts.push_back( text.substr( start, end == std::string::npos ? std::string::npos : end - start ) );
+    if ( end == std::string::npos ) {
+      return parts;
+    }
+    start = end + 1;
+  }
+}
+
+/* Rewrites colours given with colon-separated subparameters (ITU T.416),
+   such as 38:2:r:g:b, into the semicolon form the functions read. Of any
+   other parameter with subparameters, such as 4:3, only the first value
+   is kept. */
+static std::string without_subparameters( const std::string &params )
+{
+  std::string result;
+  for ( const std::string &segment : split( params, ';' ) ) {
+    std::vector<std::string> parts = split( segment, ':' );
+    if ( parts.size() >= 6 && parts[ 1 ] == "2" ) { /* colour space id before the components */
+      parts.erase( parts.begin() + 2 );
+    }
+    const bool colour = parts[ 0 ] == "38" || parts[ 0 ] == "48";
+    std::string rewritten = parts[ 0 ];
+    for ( size_t i = 1; colour && i < parts.size(); i++ ) {
+      rewritten += ";" + parts[ i ];
+    }
+    result += rewritten + ";";
+  }
+  result.erase( result.size() - 1 );
+  return result;
+}
+
 void Dispatcher::parse_params( void )
 {
   if ( parsed ) {
@@ -84,7 +121,8 @@ void Dispatcher::parse_params( void )
   }
 
   parsed_params.clear();
-  const char *str = params.c_str();
+  const std::string semicolons = without_subparameters( params );
+  const char *str = semicolons.c_str();
   const char *segment_begin = str;
 
   while ( 1 ) {
