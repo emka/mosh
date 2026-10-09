@@ -232,6 +232,16 @@ static std::string answer( const Transmission &done )
   return reply( done.id, done.error.empty() ? "OK" : done.error );
 }
 
+static bool is_continuation( const Keys &keys )
+{
+  for ( const auto &key : keys ) {
+    if ( key.first != "m" && key.first != "q" ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static const char *const TOO_BIG = "EFBIG:images are limited to 1 MiB";
 
 std::string GraphicsReceiver::apply( const std::string &body, Images &images )
@@ -242,6 +252,12 @@ std::string GraphicsReceiver::apply( const std::string &body, Images &images )
   size_t semicolon = body.find( ';' );
   Keys keys = parse_keys( body.substr( 1, semicolon == std::string::npos ? std::string::npos : semicolon - 1 ) );
   std::string payload = semicolon == std::string::npos ? std::string() : body.substr( semicolon + 1 );
+
+  /* A later chunk carries only m and q; anything else starts a new command
+     and abandons a transmission the program never finished. */
+  if ( transmission && !is_continuation( keys ) ) {
+    transmission.reset();
+  }
 
   if ( !transmission ) {
     const std::string action = keys[ "a" ].empty() ? "t" : keys[ "a" ];

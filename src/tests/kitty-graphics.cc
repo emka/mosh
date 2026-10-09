@@ -583,6 +583,19 @@ static void ignores_actions_other_than_transmit_place_and_delete( void )
   fatal_assert( image && image->base64 == "AAAA" );
 }
 
+static void deletes_after_an_abandoned_transmission( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;AAAA\033\\\033_Ga=t,i=5,f=100,m=1;AAAA\033\\" );
+
+  // When
+  term.act( "\033_Ga=d,d=A\033\\" );
+
+  // Then
+  fatal_assert( term.get_fb().image_count() == 0 );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -625,5 +638,6 @@ int main( void )
   takes_an_image_without_a_format_as_rgba();
   drops_every_image_on_a_full_reset();
   ignores_actions_other_than_transmit_place_and_delete();
+  deletes_after_an_abandoned_transmission();
   return 0;
 }
