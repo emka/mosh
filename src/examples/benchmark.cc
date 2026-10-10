@@ -88,7 +88,7 @@ int main( int argc, char **argv )
     Framebuffer *local_framebuffer = &(local_framebuffers[ fbmod ]);
     Framebuffer *new_state = &(local_framebuffers[ !fbmod ]);
     Overlay::OverlayManager overlays;
-    Display display( true, false );
+    Display display( true );
     Complete local_terminal( width, height );
 
     /* Adopt native locale */

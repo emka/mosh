@@ -31,6 +31,7 @@
 */
 
 #include "completeterminal.h"
+#include "terminalimagediff.h"
 #include "fatal_assert.h"
 
 #include "hostinput.pb.h"
@@ -86,7 +87,8 @@ string Complete::diff_from( const Complete &existing ) const
       new_res->MutableExtension( resize )->set_width( terminal.get_fb().ds.get_width() );
       new_res->MutableExtension( resize )->set_height( terminal.get_fb().ds.get_height() );
     }
-    string update = display.new_frame( true, existing.get_fb(), terminal.get_fb() );
+    string update = image_commands( existing.get_fb().get_images(), terminal.get_fb().get_images() )
+      + display.new_frame( true, existing.get_fb(), terminal.get_fb() );
     if ( !update.empty() ) {
       Instruction *new_inst = output.add_instruction();
       new_inst->MutableExtension( hostbytes )->set_hoststring( update );

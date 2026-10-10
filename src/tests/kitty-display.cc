@@ -199,13 +199,13 @@ static void sends_images_before_the_cells_that_show_them( void )
   fatal_assert( diff.find( "\033_G" ) < diff.find( "hello" ) );
 }
 
-static void leaves_images_out_of_a_display_for_the_local_terminal( void )
+static void never_draws_images_on_the_local_terminal( void )
 {
   // Given
   const Terminal::Complete blank( 80, 24 );
   Terminal::Complete term( blank );
   term.act( "\033_Ga=T,U=1,i=7,c=1,r=1,f=100;AAAA\033\\" );
-  const Terminal::Display local( false, false );
+  const Terminal::Display local( false );
 
   // When
   const std::string frame = local.new_frame( true, blank.get_fb(), term.get_fb() );
@@ -276,7 +276,7 @@ int main( void )
   sends_an_image_again_when_a_program_sends_it_again();
   tells_the_client_what_was_deleted();
   sends_images_before_the_cells_that_show_them();
-  leaves_images_out_of_a_display_for_the_local_terminal();
+  never_draws_images_on_the_local_terminal();
   gives_a_new_client_every_image_and_placement();
   keeps_a_client_applying_images_from_replying();
   return 0;

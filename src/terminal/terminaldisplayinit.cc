@@ -80,8 +80,8 @@ static const char *ti_str( const char *capname )
   return val;
 }
 
-Display::Display( bool use_environment, bool s_emits_images )
-  : has_ech( true ), has_bce( true ), has_title( true ), emits_images( s_emits_images ), smcup( NULL ), rmcup( NULL )
+Display::Display( bool use_environment )
+  : has_ech( true ), has_bce( true ), has_title( true ), smcup( NULL ), rmcup( NULL )
 {
   if ( use_environment ) {
     int errret = -2;

@@ -98,7 +98,7 @@ public:
       new_state( 1, 1 ),
       overlays(),
       network(),
-      display( true, false ), /* use TERM environment var to initialize display */
+      display( true ), /* use TERM environment var to initialize display */
       connecting_notification(),
       repaint_requested( false ),
       lf_entered( false ),
