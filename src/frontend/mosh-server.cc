@@ -97,6 +97,16 @@
 
 typedef Network::Transport< Terminal::Complete, Network::UserStream > ServerConnection;
 
+/* Moves the images the client should have one step on, once it has
+   acknowledged every state sent: one slice of image data per round trip,
+   which its receive buffer holds. */
+static void pace_images( Terminal::Complete &terminal, const ServerConnection &network )
+{
+  if ( network.caught_up() ) {
+    terminal.step_images();
+  }
+}
+
 static void serve( int host_fd,
 		   Terminal::Complete &terminal,
 		   ServerConnection &network,
@@ -773,6 +783,7 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 
 	  /* update client with new state of terminal */
 	  if ( !network.shutdown_in_progress() ) {
+	    pace_images( terminal, network );
 	    network.set_current_state( terminal );
 	  }
 	  #if defined(HAVE_SYSLOG) || defined(HAVE_UTEMPTER)
@@ -847,6 +858,7 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 	  terminal_to_host += terminal.act( string( buf, bytes_read ) );
 	
 	  /* update client with new state of terminal */
+	  pace_images( terminal, network );
 	  network.set_current_state( terminal );
 	}
       }
@@ -910,6 +922,11 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 
       if ( terminal.set_echo_ack( now ) && !network.shutdown_in_progress() ) {
 	/* update client with new echo ack */
+	pace_images( terminal, network );
+	network.set_current_state( terminal );
+      }
+
+      if ( !network.shutdown_in_progress() && network.caught_up() && terminal.step_images() ) {
 	network.set_current_state( terminal );
       }
 
