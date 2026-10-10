@@ -39,8 +39,10 @@
 
 namespace Terminal {
   /* The Kitty graphics commands that bring a client's images from one view
-     to the next: deletes first, then new images, then new placements, and
-     the start of a new upload last. */
+     to the next. A client abandons an upload at any command but its next
+     chunk, so an upload under way is continued first, or deleted along
+     with the images gone; new images and placements follow, and a new
+     upload starts last. */
   std::string image_commands( const ImageView &last, const ImageView &now );
 }
 

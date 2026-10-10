@@ -90,16 +90,23 @@ static void append_delete( std::string &out, char scope, uint32_t id )
   out.append( command );
 }
 
+/* Whether a view has an image with the given id, complete or under way. */
+static bool holds( const ImageView &view, uint32_t id )
+{
+  return view.get( id ) || ( view.uploading() && view.uploading()->id == id );
+}
+
 std::string Terminal::image_commands( const ImageView &last, const ImageView &now )
 {
   std::string out;
   const ImageView::image_type &continued = last.uploading();
-  if ( continued ) {
-    const size_t to = now.has( continued ) ? continued->base64.size()
-      : now.uploading() == continued ? now.uploaded() : 0;
+  if ( continued && ( now.has( continued ) || now.uploading() == continued ) ) {
+    const size_t to = now.has( continued ) ? continued->base64.size() : now.uploaded();
     if ( to > last.uploaded() ) {
       append_chunks( out, *continued, last.uploaded(), to );
     }
+  } else if ( continued && !holds( now, continued->id ) ) {
+    append_delete( out, 'I', continued->id );
   }
   for ( const auto &image : last.images() ) {
     if ( !now.get( image->id ) ) {

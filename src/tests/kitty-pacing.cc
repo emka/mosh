@@ -480,6 +480,24 @@ static void never_draws_images_on_the_local_terminal( void )
   fatal_assert( frame.find( "\033_G" ) == std::string::npos );
 }
 
+static void tells_the_client_to_drop_an_upload_deleted_in_flight( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;" + base64_of( 200000 ) + "\033\\" );
+  term.step_images();
+  const Terminal::Complete client( term );
+  term.act( "\033_Ga=d,d=I,i=1\033\\" );
+
+  // When
+  term.step_images();
+
+  // Then
+  std::vector<Command> commands = commands_in( term.diff_from( client ) );
+  fatal_assert( commands.size() == 1 );
+  fatal_assert( commands[ 0 ].keys[ "a" ] == "d" && commands[ 0 ].keys[ "d" ] == "I" && commands[ 0 ].keys[ "i" ] == "1" );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -494,6 +512,7 @@ int main( void )
   places_another_image_only_after_the_upload_completes();
   restarts_the_upload_of_an_image_sent_again();
   reports_a_change_when_the_image_in_flight_is_deleted();
+  tells_the_client_to_drop_an_upload_deleted_in_flight();
   gives_a_new_client_complete_images_first_and_the_partial_upload_last();
   keeps_the_order_of_a_diff_that_spans_several_steps();
   brings_a_client_applying_every_diff_to_the_terminal_images_without_replies();
