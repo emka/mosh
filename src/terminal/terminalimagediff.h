@@ -35,13 +35,13 @@
 
 #include <string>
 
-#include "terminalgraphics.h"
+#include "terminalimageview.h"
 
 namespace Terminal {
-  /* The Kitty graphics commands that bring a client's images from what it
-     has to what it should have: deletes first, then new images, then new
-     placements. */
-  std::string image_commands( const Images &last, const Images &now );
+  /* The Kitty graphics commands that bring a client's images from one view
+     to the next: deletes first, then new images, then new placements, and
+     the start of a new upload last. */
+  std::string image_commands( const ImageView &last, const ImageView &now );
 }
 
 #endif

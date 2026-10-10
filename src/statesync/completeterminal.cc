@@ -69,6 +69,11 @@ string Complete::act( const Action &act )
   return terminal.read_octets_to_host();
 }
 
+bool Complete::step_images( void )
+{
+  return view.step_toward( terminal.get_fb().get_images() );
+}
+
 /* interface for Network::Transport */
 string Complete::diff_from( const Complete &existing ) const
 {
@@ -80,6 +85,7 @@ string Complete::diff_from( const Complete &existing ) const
     new_echo->MutableExtension( echoack )->set_echo_ack_num( get_echo_ack() );
   }
 
+  string update = image_commands( existing.view, view );
   if ( !(existing.get_fb() == get_fb()) ) {
     if ( (existing.get_fb().ds.get_width() != terminal.get_fb().ds.get_width())
 	 || (existing.get_fb().ds.get_height() != terminal.get_fb().ds.get_height()) ) {
@@ -87,12 +93,11 @@ string Complete::diff_from( const Complete &existing ) const
       new_res->MutableExtension( resize )->set_width( terminal.get_fb().ds.get_width() );
       new_res->MutableExtension( resize )->set_height( terminal.get_fb().ds.get_height() );
     }
-    string update = image_commands( existing.get_fb().get_images(), terminal.get_fb().get_images() )
-      + display.new_frame( true, existing.get_fb(), terminal.get_fb() );
-    if ( !update.empty() ) {
-      Instruction *new_inst = output.add_instruction();
-      new_inst->MutableExtension( hostbytes )->set_hoststring( update );
-    }
+    update += display.new_frame( true, existing.get_fb(), terminal.get_fb() );
+  }
+  if ( !update.empty() ) {
+    Instruction *new_inst = output.add_instruction();
+    new_inst->MutableExtension( hostbytes )->set_hoststring( update );
   }
   
   return output.SerializeAsString();
@@ -126,7 +131,7 @@ void Complete::apply_string( const string & diff )
 bool Complete::operator==( Complete const &x ) const
 {
   //  assert( parser == x.parser ); /* parser state is irrelevant for us */
-  return (terminal == x.terminal) && (echo_ack == x.echo_ack);
+  return (terminal == x.terminal) && (view == x.view) && (echo_ack == x.echo_ack);
 }
 
 bool Complete::set_echo_ack( uint64_t now )

@@ -38,6 +38,7 @@
 
 #include "parser.h"
 #include "terminal.h"
+#include "terminalimageview.h"
 
 /* This class represents the complete terminal -- a UTF8Parser feeding Actions to an Emulator. */
 
@@ -47,6 +48,7 @@ namespace Terminal {
     Parser::UTF8Parser parser;
     Terminal::Emulator terminal;
     Terminal::Display display;
+    Terminal::ImageView view; /* the images the client should have now */
 
     // Only used locally by act(), but kept here as a performance optimization,
     // to avoid construction/destruction.  It must always be empty
@@ -60,7 +62,7 @@ namespace Terminal {
     static const int ECHO_TIMEOUT = 50; /* for late ack */
 
   public:
-    Complete( size_t width, size_t height ) : parser(), terminal( width, height ), display( false ),
+    Complete( size_t width, size_t height ) : parser(), terminal( width, height ), display( false ), view(),
 					      actions(), input_history(), echo_ack( 0 ) {}
     
     std::string act( const std::string &str );
@@ -72,6 +74,10 @@ namespace Terminal {
     bool set_echo_ack( uint64_t now );
     void register_input_frame( uint64_t n, uint64_t now );
     int wait_time( uint64_t now ) const;
+
+    /* Moves the images the client should have one step toward the
+       terminal's; returns whether anything changed. */
+    bool step_images( void );
 
     /* interface for Network::Transport */
     void subtract( const Complete * ) const {}

@@ -41,32 +41,34 @@ using namespace Terminal;
 /* The most base64 one graphics command carries; the client discards longer ones. */
 static const size_t IMAGE_CHUNK_BYTES = 4096;
 
-/* Sends an image with the Kitty graphics protocol, in chunks the client
-   accepts, telling the terminal that receives it not to reply. */
-static void append_image( std::string &out, const Image &image )
+/* Sends the base64 of an image from one offset to another, in chunks the
+   client accepts, telling the terminal that receives it not to reply. The
+   first chunk of an image carries its keys; the last chunk of a complete
+   image ends the upload. */
+static void append_chunks( std::string &out, const Image &image, size_t from, size_t to )
 {
-  char keys[ 128 ];
-  snprintf( keys, sizeof keys, "\033_Ga=t,i=%u,f=%d,q=2", image.id, image.format );
-  out.append( keys );
-  if ( image.width > 0 && image.height > 0 ) {
-    snprintf( keys, sizeof keys, ",s=%d,v=%d", image.width, image.height );
-    out.append( keys );
-  }
-  if ( image.zlib ) {
-    out.append( ",o=z" );
-  }
-
   const std::string &base64 = image.base64;
-  for ( size_t start = 0; start == 0 || start < base64.size(); start += IMAGE_CHUNK_BYTES ) {
-    const bool last = start + IMAGE_CHUNK_BYTES >= base64.size();
-    if ( start > 0 ) {
+  for ( size_t start = from; start == from || start < to; start += IMAGE_CHUNK_BYTES ) {
+    const size_t end = std::min( start + IMAGE_CHUNK_BYTES, to );
+    if ( start == 0 ) {
+      char keys[ 128 ];
+      snprintf( keys, sizeof keys, "\033_Ga=t,i=%u,f=%d,q=2", image.id, image.format );
+      out.append( keys );
+      if ( image.width > 0 && image.height > 0 ) {
+        snprintf( keys, sizeof keys, ",s=%d,v=%d", image.width, image.height );
+        out.append( keys );
+      }
+      if ( image.zlib ) {
+        out.append( ",o=z" );
+      }
+    } else {
       out.append( "\033_Gq=2" );
     }
-    if ( start > 0 || !last ) {
-      out.append( last ? ",m=0" : ",m=1" );
+    if ( start > 0 || end < base64.size() ) {
+      out.append( end == base64.size() ? ",m=0" : ",m=1" );
     }
     out.append( 1, ';' );
-    out.append( base64, start, IMAGE_CHUNK_BYTES );
+    out.append( base64, start, end - start );
     out.append( "\033\\" );
   }
 }
@@ -88,27 +90,37 @@ static void append_delete( std::string &out, char scope, uint32_t id )
   out.append( command );
 }
 
-std::string Terminal::image_commands( const Images &last, const Images &now )
+std::string Terminal::image_commands( const ImageView &last, const ImageView &now )
 {
   std::string out;
-  for ( const auto &image : last.list() ) {
+  const ImageView::image_type &continued = last.uploading();
+  if ( continued ) {
+    const size_t to = now.has( continued ) ? continued->base64.size()
+      : now.uploading() == continued ? now.uploaded() : 0;
+    if ( to > last.uploaded() ) {
+      append_chunks( out, *continued, last.uploaded(), to );
+    }
+  }
+  for ( const auto &image : last.images() ) {
     if ( !now.get( image->id ) ) {
       append_delete( out, 'I', image->id );
     } else if ( last.placement( image->id ) && !now.placement( image->id ) ) {
       append_delete( out, 'i', image->id );
     }
   }
-  for ( const auto &image : now.list() ) {
-    const Images::list_type &sent = last.list();
-    if ( std::find( sent.begin(), sent.end(), image ) == sent.end() ) {
-      append_image( out, *image );
+  for ( const auto &image : now.images() ) {
+    if ( image != continued && !last.has( image ) ) {
+      append_chunks( out, *image, 0, image->base64.size() );
     }
   }
-  for ( const auto &image : now.list() ) {
+  for ( const auto &image : now.images() ) {
     const std::optional<ImagePlacement> placement = now.placement( image->id );
     if ( placement && placement != last.placement( image->id ) ) {
       append_placement( out, image->id, *placement );
     }
+  }
+  if ( now.uploading() && now.uploading() != continued ) {
+    append_chunks( out, *now.uploading(), 0, now.uploaded() );
   }
   return out;
 }
