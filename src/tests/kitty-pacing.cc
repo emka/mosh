@@ -498,6 +498,37 @@ static void tells_the_client_to_drop_an_upload_deleted_in_flight( void )
   fatal_assert( commands[ 0 ].keys[ "a" ] == "d" && commands[ 0 ].keys[ "d" ] == "I" && commands[ 0 ].keys[ "i" ] == "1" );
 }
 
+static void steps_images_the_client_has_acknowledged_while_text_changes( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  term.act( "\033_Ga=t,i=1,f=100;" + base64_of( 200000 ) + "\033\\" );
+  term.step_images();
+  const Terminal::Complete acknowledged( term );
+  term.act( "hello" );
+
+  // When
+  const bool stepped = term.step_images_after( acknowledged );
+
+  // Then
+  fatal_assert( stepped );
+}
+
+static void waits_for_the_client_to_acknowledge_the_last_step( void )
+{
+  // Given
+  Terminal::Complete term( 80, 24 );
+  const Terminal::Complete acknowledged( term );
+  term.act( "\033_Ga=t,i=1,f=100;" + base64_of( 200000 ) + "\033\\" );
+  term.step_images();
+
+  // When
+  const bool stepped = term.step_images_after( acknowledged );
+
+  // Then
+  fatal_assert( !stepped );
+}
+
 int main( void )
 {
   /* mosh-server runs in a UTF-8 locale; the parser decodes input with it. */
@@ -513,6 +544,8 @@ int main( void )
   restarts_the_upload_of_an_image_sent_again();
   reports_a_change_when_the_image_in_flight_is_deleted();
   tells_the_client_to_drop_an_upload_deleted_in_flight();
+  steps_images_the_client_has_acknowledged_while_text_changes();
+  waits_for_the_client_to_acknowledge_the_last_step();
   gives_a_new_client_complete_images_first_and_the_partial_upload_last();
   keeps_the_order_of_a_diff_that_spans_several_steps();
   brings_a_client_applying_every_diff_to_the_terminal_images_without_replies();

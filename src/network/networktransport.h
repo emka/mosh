@@ -113,7 +113,7 @@ namespace Network {
     uint64_t get_sent_state_acked_timestamp( void ) const { return sender.get_sent_state_acked_timestamp(); }
     uint64_t get_sent_state_acked( void ) const { return sender.get_sent_state_acked(); }
     uint64_t get_sent_state_last( void ) const { return sender.get_sent_state_last(); }
-    bool caught_up( void ) const { return sender.caught_up(); }
+    const MyState &get_sent_state_acked_state( void ) const { return sender.get_sent_state_acked_state(); }
 
     unsigned int send_interval( void ) const { return sender.send_interval(); }
 

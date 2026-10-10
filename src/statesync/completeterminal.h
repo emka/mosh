@@ -78,6 +78,12 @@ namespace Terminal {
     /* Moves the images the client should have one step toward the
        terminal's; returns whether anything changed. */
     bool step_images( void );
+    /* Steps the images only once the client has acknowledged a state
+       holding the images it should have now: one step per round trip. */
+    bool step_images_after( const Complete &acknowledged )
+    {
+      return acknowledged.view == view && step_images();
+    }
 
     /* interface for Network::Transport */
     void subtract( const Complete * ) const {}

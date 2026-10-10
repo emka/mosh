@@ -98,13 +98,11 @@
 typedef Network::Transport< Terminal::Complete, Network::UserStream > ServerConnection;
 
 /* Moves the images the client should have one step on, once it has
-   acknowledged every state sent: one slice of image data per round trip,
+   acknowledged the last step: one slice of image data per round trip,
    which its receive buffer holds. */
-static void pace_images( Terminal::Complete &terminal, const ServerConnection &network )
+static bool pace_images( Terminal::Complete &terminal, const ServerConnection &network )
 {
-  if ( network.caught_up() ) {
-    terminal.step_images();
-  }
+  return terminal.step_images_after( network.get_sent_state_acked_state() );
 }
 
 static void serve( int host_fd,
@@ -926,7 +924,7 @@ static void serve( int host_fd, Terminal::Complete &terminal, ServerConnection &
 	network.set_current_state( terminal );
       }
 
-      if ( !network.shutdown_in_progress() && network.caught_up() && terminal.step_images() ) {
+      if ( !network.shutdown_in_progress() && pace_images( terminal, network ) ) {
 	network.set_current_state( terminal );
       }
 

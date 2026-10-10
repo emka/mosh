@@ -152,13 +152,7 @@ namespace Network {
     uint64_t get_sent_state_acked_timestamp( void ) const { return sent_states.front().timestamp; }
     uint64_t get_sent_state_acked( void ) const { return sent_states.front().num; }
     uint64_t get_sent_state_last( void ) const { return sent_states.back().num; }
-
-    /* Whether the receiver has acknowledged every state sent, and no newer
-       state waits to be sent. */
-    bool caught_up( void ) const
-    {
-      return sent_states.front().num == sent_states.back().num && current_state == sent_states.back().state;
-    }
+    const MyState &get_sent_state_acked_state( void ) const { return sent_states.front().state; }
 
     bool shutdown_ack_timed_out( void ) const;
 
